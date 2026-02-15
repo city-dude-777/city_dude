@@ -236,7 +236,7 @@ export class Game {
                     this.player.update(dt, this.input, this.tileMap);
                 }
                 this.vehicleManager.update(dt);
-                this.npcManager.update(dt, this.vehicleManager.vehicles);
+                this.npcManager.update(dt, this.vehicleManager.vehicles, this.vehicleManager.getActiveSiren());
                 this._claimDropoffReward();
                 this._updateCamera();
                 if (this.goalCompleteTimer <= 0) {
@@ -485,13 +485,19 @@ export class Game {
             this.vehicleManager.update(dt);
             const speedNorm = Math.min(1, Math.abs(vehicle.velocity) / vehicle.type.maxPlayerSpeed);
             this.sound.updateEngine(speedNorm);
+            // Check for crash phrase
+            if (this.vehicleManager.lastCrashPhrase) {
+                this.hud.showMessage(`Driver: "${this.vehicleManager.lastCrashPhrase}"`, 2.5);
+                this.vehicleManager.lastCrashPhrase = null;
+            }
         } else {
             this.player.update(dt, this.input, this.tileMap);
             this.vehicleManager.update(dt);
         }
 
         // --- NPCs ---
-        this.npcManager.update(dt, this.vehicleManager.vehicles);
+        const sirenVehicle = this.vehicleManager.getActiveSiren();
+        this.npcManager.update(dt, this.vehicleManager.vehicles, sirenVehicle);
         this.npcManager.updateBasketball(dt);
 
         // Check for pickups (NPCs that hopped in this frame)
@@ -1223,8 +1229,8 @@ export class Game {
         const dumpsterPositions = [
             { col: 56, row: 21 },
             { col: 58, row: 21 },
-            { col: 53, row: 23 },
-            { col: 58, row: 23 },
+            { col: 53, row: 24 },
+            { col: 58, row: 24 },
         ];
         for (const dp of dumpsterPositions) {
             const wx = dp.col * T + T / 2;

@@ -180,14 +180,14 @@ export function createDudeAngelesMap() {
 
     // Hotel
     buildings.push({ x: 44, y: 8, w: 4, h: 3, color: '#8e44ad', roof: '#6c3483', name: 'Dude Hotel',
-        enterable: true, shopkeeperName: 'Receptionist Amy', shopItems: [], isHotel: true });
+        enterable: true, shopkeeperName: 'Receptionist Amy', shopItems: [], isHotel: true, floors: 4 });
     fillRect(tiles, TILES.BUILDING, 44, 8, 4, 3, width, height);
 
     // Trees in yard
     tiles[9][43] = TILES.TREE;
 
     // --- MW Block: Office District ---
-    buildings.push({ x: 3, y: 16, w: 5, h: 4, color: '#5d6d7e', roof: '#4a5768', name: 'Office Tower', enterable: true });
+    buildings.push({ x: 3, y: 16, w: 5, h: 4, color: '#5d6d7e', roof: '#4a5768', name: 'Office Tower', enterable: true, floors: 5 });
     fillRect(tiles, TILES.BUILDING, 3, 16, 5, 4, width, height);
 
     buildings.push({ x: 9, y: 16, w: 2, h: 3, color: '#85929e', roof: '#6b7a88', name: 'Parking Garage', enterable: true });
@@ -200,10 +200,10 @@ export function createDudeAngelesMap() {
     fillRect(tiles, TILES.BUILDING, 3, 22, 4, 2, width, height);
 
     // --- MC Block: Downtown ---
-    buildings.push({ x: 16, y: 16, w: 4, h: 4, color: '#2c3e50', roof: '#1a252f', name: 'City Hall', enterable: true });
+    buildings.push({ x: 16, y: 16, w: 4, h: 4, color: '#2c3e50', roof: '#1a252f', name: 'City Hall', enterable: true, floors: 3 });
     fillRect(tiles, TILES.BUILDING, 16, 16, 4, 4, width, height);
 
-    buildings.push({ x: 21, y: 17, w: 2, h: 3, color: '#c0392b', roof: '#962d22', name: 'Fire Station', enterable: true, shopkeeperName: 'Chief Burns', shopItems: [] });
+    buildings.push({ x: 21, y: 17, w: 2, h: 3, color: '#c0392b', roof: '#962d22', name: 'Fire Station', enterable: true, shopkeeperName: 'Chief Burns', shopItems: [], floors: 2 });
     fillRect(tiles, TILES.BUILDING, 21, 17, 2, 3, width, height);
 
     // --- Police Station ---
@@ -315,7 +315,7 @@ export function createDudeAngelesMap() {
 
     // --- Card Store (near library) ---
     buildings.push({ x: 20, y: 30, w: 3, h: 2, color: '#e67e22', roof: '#d35400', name: 'Card Store',
-        enterable: true, shopkeeperName: 'Card Collector Rick', shopItems: ['mega_evo_card', 'josh_dallan_card'] });
+        enterable: true, shopkeeperName: 'Card Collector Rick', shopItems: ['mega_evo_card', 'josh_dallan_card', 'shiny_treasure_pack'] });
     fillRect(tiles, TILES.BUILDING, 20, 30, 3, 2, width, height);
 
     // --- Museum (next to library) ---
@@ -413,24 +413,8 @@ export function createDudeAngelesMap() {
     tiles[26][10] = TILES.CONE;
 
     // --- Garbage Center (outdoor area, east of locker room) ---
-    // Fence perimeter (cols 52-59, rows 20-25)
-    // Only place fence on corners + left/right walls; wide open north entrance
-    tiles[20][52] = TILES.FENCE;  // NW corner
-    tiles[20][59] = TILES.FENCE;  // NE corner
-    for (let c = 52; c <= 59; c++) {
-        tiles[25][c] = TILES.FENCE; // south wall
-    }
-    for (let r = 20; r <= 25; r++) {
-        tiles[r][52] = TILES.FENCE; // west wall
-        tiles[r][59] = TILES.FENCE; // east wall
-    }
-    // Wide entrance gap (north side, cols 53-58 = 6 tiles wide for trucks)
-    for (let c = 53; c <= 58; c++) {
-        tiles[20][c] = TILES.CONCRETE;
-    }
-
-    // Concrete floor inside
-    fillRect(tiles, TILES.CONCRETE, 53, 21, 6, 4, width, height);
+    // Open area, no fence — just concrete pad
+    fillRect(tiles, TILES.CONCRETE, 52, 20, 8, 6, width, height);
 
     // Garbage Break Room (inside the garbage center)
     buildings.push({ x: 53, y: 21, w: 2, h: 1, color: '#6b7b3a', roof: '#4a5528', name: 'Garbage Break Room',
@@ -495,8 +479,8 @@ export function createDudeAngelesMap() {
         },
         // Excavator spawn position (inside construction site)
         excavatorSpawn: { col: 56, row: 31 },
-        // Driveable construction truck+trailer near construction entrance
-        constructionTruckSpawn: { col: 57, row: 28 },
+        // Driveable construction truck+trailer on road near construction entrance
+        constructionTruckSpawn: { col: 55, row: 27 },
         // Garbage center
         garbageCenter: {
             zoneCols: [53, 58],
@@ -506,8 +490,8 @@ export function createDudeAngelesMap() {
         garbageTruckSpawns: [
             { col: 55, row: 22 },
             { col: 57, row: 22 },
-            { col: 55, row: 24 },
-            { col: 57, row: 24 },
+            { col: 55, row: 23 },
+            { col: 57, row: 23 },
         ],
         // Garbage cans around city
         garbageCans,

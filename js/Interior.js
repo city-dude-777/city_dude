@@ -26,6 +26,7 @@ export const SHOP_CATALOG = {
     vinyl:      { id: 'vinyl',      name: 'Vinyl Record', price: 20, icon: 'V', color: '#1a1a2e', desc: 'Sick beats' },
     mega_evo_card: { id: 'mega_evo_card', name: 'Mega Evolution Card', price: 50, icon: 'M', color: '#e74c3c', desc: 'Ultra rare Mega Evolution!' },
     josh_dallan_card: { id: 'josh_dallan_card', name: 'PSA 10 Josh Dallan', price: 200, icon: 'J', color: '#1a5276', desc: '1/1 PSA 10 Dude Dinosaur #17' },
+    shiny_treasure_pack: { id: 'shiny_treasure_pack', name: 'Shiny Treasure Pack', price: 30, icon: 'S', color: '#ffd700', desc: 'Shiny holographic treasure pack!' },
 };
 
 const CELL = { FLOOR: 0, WALL: 1, COUNTER: 2, SHELF: 3 };
@@ -244,6 +245,26 @@ export class InteriorManager {
         };
         this.shopItems = (building.shopItems || []).map(id => SHOP_CATALOG[id]).filter(Boolean);
 
+        // Add customers to restaurants
+        const restaurants = ['Pizza Palace', 'Burger Barn', 'Taco Town', 'Sushi Street', 'Ice Cream Hut', 'Chill Coffee'];
+        if (restaurants.includes(building.name)) {
+            const customerStyles = [
+                { shirt: '#e74c3c', skin: '#f0c27a', hair: '#4a3520' },
+                { shirt: '#3498db', skin: '#d4a574', hair: '#1a1a1a' },
+                { shirt: '#f39c12', skin: '#e8b88a', hair: '#6b4423' },
+            ];
+            // Place 2-3 customers at open floor spots
+            let placed = 0;
+            for (let r = 3; r < h-1 && placed < 3; r++) {
+                for (let c = 2; c < w-2 && placed < 3; c++) {
+                    if (this.grid[r][c] === CELL.FLOOR && (r + c) % 3 === 0) {
+                        this.interiorNPCs.push({ col: c, row: r, style: customerStyles[placed % customerStyles.length] });
+                        placed++;
+                    }
+                }
+            }
+        }
+
         // Add unique decor per shop
         if (building.name === 'Pizza Palace') {
             this.decor.push({ type: 'oven', col: 1, row: 1 });
@@ -326,17 +347,49 @@ export class InteriorManager {
     // ---- Commercial / Public Interiors ----
 
     _genOfficeTower(w, h) {
-        // Cubicles (counters as desks)
-        for (let r = 2; r < h-2; r += 2) {
-            this.grid[r][2] = CELL.COUNTER;
-            this.grid[r][3] = CELL.COUNTER;
-            if (w > 8) { this.grid[r][w-3] = CELL.COUNTER; this.grid[r][w-4] = CELL.COUNTER; }
+        // Rows of desks with computers (left and right sides, center aisle clear)
+        const mid = Math.floor(w / 2);
+        for (let r = 2; r < h - 2; r += 2) {
+            // Left desk pair
+            if (this.grid[r][1] === CELL.FLOOR) this.grid[r][1] = CELL.COUNTER;
+            if (this.grid[r][2] === CELL.FLOOR) this.grid[r][2] = CELL.COUNTER;
+            this.decor.push({ type: 'monitor', col: 1, row: r });
+            this.decor.push({ type: 'monitor', col: 2, row: r });
+            // Right desk pair
+            if (this.grid[r][w-2] === CELL.FLOOR) this.grid[r][w-2] = CELL.COUNTER;
+            if (this.grid[r][w-3] === CELL.FLOOR) this.grid[r][w-3] = CELL.COUNTER;
+            this.decor.push({ type: 'monitor', col: w-2, row: r });
+            this.decor.push({ type: 'monitor', col: w-3, row: r });
         }
-        this.grid[1][1] = CELL.SHELF; // filing cabinet
+        // Shelves along walls (filing cabinets / bookshelves)
+        this.grid[1][1] = CELL.SHELF;
+        this.grid[1][2] = CELL.SHELF;
         this.grid[1][w-2] = CELL.SHELF;
-        this.decor.push({ type: 'water_cooler', col: Math.floor(w/2), row: 1 });
-        this.interiorNPCs.push({ col: 3, row: 2, style: { shirt: '#2c3e50', skin: '#f0c27a', hair: '#4a3520' } });
-        this.interiorNPCs.push({ col: w-3, row: 4, style: { shirt: '#85929e', skin: '#d4a574', hair: '#2c1810' } });
+        this.grid[1][w-3] = CELL.SHELF;
+        if (h > 6) {
+            this.grid[h-2][1] = CELL.SHELF;
+            this.grid[h-2][w-2] = CELL.SHELF;
+        }
+        // Water cooler
+        this.decor.push({ type: 'water_cooler', col: mid, row: 1 });
+        // Plant in corner
+        this.decor.push({ type: 'plant', col: mid - 1, row: h - 2 });
+        this.decor.push({ type: 'plant', col: mid + 1, row: h - 2 });
+        // Office workers at desks
+        const workerStyles = [
+            { shirt: '#2c3e50', skin: '#f0c27a', hair: '#4a3520' },
+            { shirt: '#85929e', skin: '#d4a574', hair: '#2c1810' },
+            { shirt: '#1abc9c', skin: '#e8b88a', hair: '#1a1a1a' },
+            { shirt: '#3498db', skin: '#c68642', hair: '#6b4423' },
+            { shirt: '#9b59b6', skin: '#f0c27a', hair: '#8b6040' },
+        ];
+        let wi = 0;
+        for (let r = 2; r < h - 2 && wi < 5; r += 2) {
+            this.interiorNPCs.push({ col: 3, row: r, style: workerStyles[wi++ % workerStyles.length] });
+            if (wi < 5) {
+                this.interiorNPCs.push({ col: w - 4, row: r, style: workerStyles[wi++ % workerStyles.length] });
+            }
+        }
     }
 
     _genParkingGarage(w, h) {
@@ -414,7 +467,26 @@ export class InteriorManager {
         // Blackboard
         this.decor.push({ type: 'blackboard', col: Math.floor(w/2), row: 0 });
         this.decor.push({ type: 'globe', col: 1, row: 1 });
-        this.interiorNPCs.push({ col: Math.floor(w/2), row: 1, style: { shirt: '#85929e', skin: '#e8c8a0', hair: '#6b3a2a' } });
+        // Teacher
+        this.interiorNPCs.push({ col: Math.floor(w/2), row: 1, style: { shirt: '#85929e', skin: '#e8c8a0', hair: '#6b3a2a' }, label: 'TEACHER' });
+        // Students sitting at desks
+        const studentStyles = [
+            { shirt: '#9b59b6', skin: '#f0c27a', hair: '#1a1a1a' },
+            { shirt: '#3498db', skin: '#d4a574', hair: '#4a3520' },
+            { shirt: '#e74c3c', skin: '#e8b88a', hair: '#6b4423' },
+            { shirt: '#2ecc71', skin: '#c68642', hair: '#2c1810' },
+            { shirt: '#f39c12', skin: '#f0c27a', hair: '#8b6040' },
+            { shirt: '#1abc9c', skin: '#d4a574', hair: '#1a1a1a' },
+        ];
+        let si = 0;
+        for (let r = 2; r < h-2; r += 2) {
+            for (let c = 3; c < w-2; c += 2) {
+                if (si < studentStyles.length && this.grid[r][c] === CELL.FLOOR) {
+                    this.interiorNPCs.push({ col: c, row: r, style: studentStyles[si % studentStyles.length], label: 'STUDENT' });
+                    si++;
+                }
+            }
+        }
     }
 
     _genLibrary(w, h, building) {
@@ -638,17 +710,30 @@ export class InteriorManager {
     }
 
     _genCardStore(w, h, building) {
-        // Counter
+        // Counter (shopkeeper area)
         const counterRow = 2;
         for (let c = 2; c < w-2; c++) this.grid[counterRow][c] = CELL.COUNTER;
-        // Display shelves
+        // Display shelves along walls
         for (let r = 3; r < h-2; r += 2) {
             if (this.grid[r][1] === CELL.FLOOR) this.grid[r][1] = CELL.SHELF;
             if (this.grid[r][w-2] === CELL.FLOOR) this.grid[r][w-2] = CELL.SHELF;
         }
-        // Card display decor
+        // Glass display cases (center of store)
+        const mid = Math.floor(w / 2);
+        if (h > 5 && this.grid[4][mid] === CELL.FLOOR) {
+            this.grid[4][mid] = CELL.COUNTER;
+            this.decor.push({ type: 'glass_display', col: mid, row: 4 });
+        }
+        if (h > 5 && mid - 1 > 1 && this.grid[4][mid-1] === CELL.FLOOR) {
+            this.grid[4][mid-1] = CELL.COUNTER;
+            this.decor.push({ type: 'glass_display', col: mid-1, row: 4 });
+        }
+        // Card displays near entrance
         this.decor.push({ type: 'card_display', col: 1, row: 1 });
         this.decor.push({ type: 'card_display', col: w-2, row: 1 });
+        // Pack display on counter
+        this.decor.push({ type: 'pack_display', col: Math.floor(w/2) - 1, row: counterRow });
+        this.decor.push({ type: 'pack_display', col: Math.floor(w/2) + 1, row: counterRow });
         this.decor.push({ type: 'poster', col: Math.floor(w/2), row: 0 });
         // Shopkeeper
         this.shopkeeper = {
@@ -657,6 +742,21 @@ export class InteriorManager {
             style: SK_STYLE_MAP[building.name] || SK_STYLES.card_collector,
         };
         this.shopItems = (building.shopItems || []).map(id => SHOP_CATALOG[id]).filter(Boolean);
+        // Customers browsing cards
+        const cardCustomers = [
+            { shirt: '#9b59b6', skin: '#f0c27a', hair: '#1a1a1a' },
+            { shirt: '#e67e22', skin: '#d4a574', hair: '#4a3520' },
+        ];
+        let placed = 0;
+        for (let r = 3; r < h-1 && placed < 2; r++) {
+            for (let c = 2; c < w-2 && placed < 2; c++) {
+                if (this.grid[r][c] === CELL.FLOOR) {
+                    this.interiorNPCs.push({ col: c, row: r, style: cardCustomers[placed] });
+                    placed++;
+                    c++;
+                }
+            }
+        }
     }
 
     _genGroceryStore(w, h, building) {
@@ -1117,12 +1217,40 @@ export class InteriorManager {
                     break;
                 case 'card_display':
                     ctx.fillStyle = '#6b4423'; ctx.fillRect(x + 4, y + 2, ITILE - 8, ITILE - 4);
-                    // Cards on display
                     ctx.fillStyle = '#e74c3c'; ctx.fillRect(x + 8, y + 6, 10, 14);
                     ctx.fillStyle = '#3498db'; ctx.fillRect(x + 22, y + 8, 10, 14);
                     ctx.fillStyle = '#f1c40f'; ctx.fillRect(x + 14, y + 24, 10, 12);
-                    // Star
                     ctx.fillStyle = '#fff'; ctx.font = '6px monospace'; ctx.fillText('\u2605', x + 10, y + 16);
+                    break;
+                case 'glass_display':
+                    // Glass display case - transparent with cards and packs inside
+                    ctx.fillStyle = 'rgba(200,230,255,0.25)'; ctx.fillRect(x + 2, y + 2, ITILE - 4, ITILE - 4);
+                    ctx.strokeStyle = 'rgba(100,180,255,0.6)'; ctx.lineWidth = 2;
+                    ctx.strokeRect(x + 2, y + 2, ITILE - 4, ITILE - 4);
+                    // Glass shine effect
+                    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(x + 6, y + 4); ctx.lineTo(x + 12, y + 4); ctx.stroke();
+                    // Cards inside the glass
+                    ctx.fillStyle = '#e74c3c'; ctx.fillRect(x + 6, y + 10, 8, 12);
+                    ctx.fillStyle = '#ffd700'; ctx.fillRect(x + 18, y + 10, 8, 12);
+                    ctx.fillStyle = '#3498db'; ctx.fillRect(x + 30, y + 10, 8, 12);
+                    // Pack inside
+                    ctx.fillStyle = '#9b59b6'; ctx.fillRect(x + 10, y + 26, 12, 14);
+                    ctx.fillStyle = '#ffd700'; ctx.fillRect(x + 24, y + 28, 12, 12);
+                    // Shiny sparkle
+                    ctx.fillStyle = '#fff'; ctx.font = '8px monospace';
+                    ctx.fillText('\u2728', x + 8, y + 20);
+                    ctx.fillText('\u2728', x + 30, y + 38);
+                    break;
+                case 'pack_display':
+                    // Stacked card packs on counter
+                    ctx.fillStyle = '#ffd700'; ctx.fillRect(x + 8, y + 4, 14, 18);
+                    ctx.fillStyle = '#c0392b'; ctx.fillRect(x + 24, y + 6, 14, 18);
+                    ctx.fillStyle = '#8e44ad'; ctx.fillRect(x + 14, y + 22, 14, 16);
+                    // Shiny label
+                    ctx.fillStyle = '#fff'; ctx.font = '5px monospace';
+                    ctx.fillText('\u2605', x + 12, y + 15);
+                    ctx.fillText('\u2605', x + 28, y + 17);
                     break;
             }
         }

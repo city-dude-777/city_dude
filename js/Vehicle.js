@@ -451,8 +451,8 @@ export class VehicleManager {
             { type: 'sedan', col: 42, row: 12, dir: DIR.RIGHT },
             // Police car downtown
             { type: 'police', col: 18, row: 25, dir: DIR.RIGHT },
-            // Ambulance near school
-            { type: 'ambulance', col: 5, row: 28, dir: DIR.DOWN },
+            // Ambulance on road near school
+            { type: 'ambulance', col: 5, row: 27, dir: DIR.RIGHT },
             // Sports car near beach
             { type: 'sports_car', col: 39, row: 28, dir: DIR.LEFT },
             // Near stadium
@@ -691,6 +691,36 @@ export class VehicleManager {
             }
         }
 
+        // Vehicle-to-vehicle collision
+        this.lastCrashPhrase = null;
+        const cr = collisionRadius;
+        for (const other of this.vehicles) {
+            if (other === vehicle || other.state === 'player_driven') continue;
+            const dist = Math.hypot(vehicle.x - other.x, vehicle.y - other.y);
+            const minDist = cr + other.getCollisionRadius();
+            if (dist < minDist && Math.abs(vehicle.velocity) > 30) {
+                // Push apart
+                const overlap = minDist - dist;
+                const ax = (vehicle.x - other.x) / (dist || 1);
+                const ay = (vehicle.y - other.y) / (dist || 1);
+                vehicle.x += ax * overlap * 0.5;
+                vehicle.y += ay * overlap * 0.5;
+                vehicle.velocity *= -0.3;
+                // Crash phrase (cooldown 3 seconds)
+                const now = performance.now();
+                if (!this._lastCrashTime || now - this._lastCrashTime > 3000) {
+                    const phrases = [
+                        'Take your aggressiveness somewhere else!',
+                        'I have no insurance!',
+                        'Fender bender!',
+                    ];
+                    this.lastCrashPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+                    this._lastCrashTime = now;
+                }
+                break;
+            }
+        }
+
         // Clamp to world bounds
         const margin = TILE_SIZE;
         vehicle.x = Math.max(margin, Math.min(vehicle.x, this.mapWidth * TILE_SIZE - margin));
@@ -807,8 +837,56 @@ export class VehicleManager {
         }
     }
 
+    /**
+     * Get the position and direction of the active siren vehicle (player-driven).
+     * Returns null if no siren is active.
+     */
+    getActiveSiren() {
+        for (const v of this.vehicles) {
+            if (v.state === 'player_driven' && v.sirenOn) {
+                return v;
+            }
+        }
+        return null;
+    }
+
     _updateAIVehicle(vehicle, dt) {
         const T = TILE_SIZE;
+
+        // --- Siren reaction: pull over to the side ---
+        const sirenVehicle = this.getActiveSiren();
+        if (sirenVehicle) {
+            const dist = Math.hypot(vehicle.x - sirenVehicle.x, vehicle.y - sirenVehicle.y);
+            if (dist < T * 8) {
+                // Slow down drastically
+                vehicle.currentSpeed = vehicle.aiSpeed * 0.15;
+
+                // Nudge toward the side of the road (right side relative to travel direction)
+                const nudge = 40 * dt;
+                switch (vehicle.direction) {
+                    case DIR.RIGHT: case DIR.LEFT:
+                        // Move down (to the right curb from driver perspective)
+                        vehicle.y += nudge;
+                        break;
+                    case DIR.DOWN: case DIR.UP:
+                        // Move right
+                        vehicle.x += nudge;
+                        break;
+                }
+
+                // Apply slow movement
+                const moveAmount = vehicle.currentSpeed * dt;
+                switch (vehicle.direction) {
+                    case DIR.RIGHT: vehicle.x += moveAmount; break;
+                    case DIR.LEFT:  vehicle.x -= moveAmount; break;
+                    case DIR.DOWN:  vehicle.y += moveAmount; break;
+                    case DIR.UP:    vehicle.y -= moveAmount; break;
+                }
+                vehicle.angle = DIR_TO_ANGLE[vehicle.direction];
+                return; // skip normal AI logic
+            }
+        }
+
         const aheadDist = this._distanceToVehicleAhead(vehicle);
         if (aheadDist < T * 1.5) {
             vehicle.currentSpeed = 0;

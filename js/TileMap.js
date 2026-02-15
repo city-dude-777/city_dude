@@ -244,19 +244,38 @@ export class TileMap {
     _renderBuilding(ctx, building) {
         const T = TILE_SIZE;
         const x = building.x * T;
-        const y = building.y * T;
+        const footprintY = building.y * T;
         const w = building.w * T;
-        const h = building.h * T;
+        const footprintH = building.h * T;
 
-        // Building shadow
-        ctx.fillStyle = 'rgba(0,0,0,0.15)';
-        ctx.fillRect(x + 4, y + 4, w, h);
+        const floors = building.floors || 1;
+        const floorHeight = 20;
+        const extraHeight = (floors - 1) * floorHeight;
+        const y = footprintY - extraHeight;
+        const h = footprintH + extraHeight;
+
+        // Building shadow (larger for taller buildings)
+        ctx.fillStyle = `rgba(0,0,0,${0.1 + floors * 0.02})`;
+        ctx.fillRect(x + 3 + floors, y + 3 + floors, w, h);
 
         // Main building body
         ctx.fillStyle = building.color;
         ctx.fillRect(x, y, w, h);
 
-        // Roof line (top 6px darker)
+        // Floor separator lines
+        if (floors > 1) {
+            ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+            ctx.lineWidth = 1;
+            for (let f = 1; f < floors; f++) {
+                const lineY = y + h - f * floorHeight;
+                ctx.beginPath();
+                ctx.moveTo(x, lineY);
+                ctx.lineTo(x + w, lineY);
+                ctx.stroke();
+            }
+        }
+
+        // Roof line (top darker)
         ctx.fillStyle = building.roof;
         ctx.fillRect(x, y, w, 6);
 
@@ -265,16 +284,16 @@ export class TileMap {
         ctx.lineWidth = 1;
         ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
 
-        // Windows
+        // Windows (1 row per floor)
         ctx.fillStyle = 'rgba(200, 220, 255, 0.6)';
         const windowSize = 6;
-        const windowGap = 10;
-        for (let wy = y + 12; wy < y + h - 10; wy += windowGap + windowSize) {
-            for (let wx = x + 8; wx < x + w - 10; wx += windowGap + windowSize) {
-                ctx.fillRect(wx, wy, windowSize, windowSize);
-                // Window frame
+        for (let f = 0; f < floors; f++) {
+            const floorTop = y + h - (f + 1) * floorHeight + 4;
+            if (floorTop < y + 8) continue;
+            for (let wx = x + 8; wx < x + w - 10; wx += 16) {
+                ctx.fillRect(wx, floorTop, windowSize, windowSize);
                 ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-                ctx.strokeRect(wx, wy, windowSize, windowSize);
+                ctx.strokeRect(wx, floorTop, windowSize, windowSize);
             }
         }
 
@@ -282,10 +301,9 @@ export class TileMap {
         const doorW = 8;
         const doorH = 12;
         const doorX = x + Math.floor(w / 2) - Math.floor(doorW / 2);
-        const doorY = y + h - doorH;
+        const doorY = footprintY + footprintH - doorH;
         ctx.fillStyle = '#4a3520';
         ctx.fillRect(doorX, doorY, doorW, doorH);
-        // Door knob
         ctx.fillStyle = '#c0a060';
         ctx.fillRect(doorX + doorW - 3, doorY + doorH / 2, 2, 2);
     }

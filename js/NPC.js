@@ -1097,8 +1097,30 @@ export class NPCManager {
 
     // ---- Update ----
 
-    update(dt, vehicles) {
+    update(dt, vehicles, sirenVehicle) {
         for (const npc of this.npcs) {
+            // Siren dodge: pedestrians move to the side when siren is nearby
+            if (sirenVehicle && npc.role === 'pedestrian' &&
+                (npc.state === 'walking' || npc.state === 'idle')) {
+                const cx = npc.x + npc.width / 2;
+                const cy = npc.y + npc.height / 2;
+                const dist = Math.hypot(cx - sirenVehicle.x, cy - sirenVehicle.y);
+                if (dist < TILE_SIZE * 6) {
+                    // Run away from the siren vehicle (perpendicular to its path)
+                    const dx = cx - sirenVehicle.x;
+                    const dy = cy - sirenVehicle.y;
+                    const len = Math.max(1, Math.hypot(dx, dy));
+                    npc.x += (dx / len) * 80 * dt;
+                    npc.y += (dy / len) * 80 * dt;
+                    npc.animTimer += dt;
+                    if (npc.animTimer >= 0.15) {
+                        npc.animTimer -= 0.15;
+                        npc.animFrame = npc.animFrame === 1 ? 2 : 1;
+                    }
+                    continue; // skip normal update
+                }
+            }
+
             switch (npc.state) {
                 case 'walking':
                     this._updateWalking(npc, dt);
