@@ -38,7 +38,7 @@ export class Game {
         this.ctx.imageSmoothingEnabled = false;
 
         // Core systems
-        this.input = new Input();
+        this.input = new Input(canvas);
         this.camera = new Camera();
         this.hud = new HUD();
         this.goalManager = new GoalManager();
@@ -213,6 +213,9 @@ export class Game {
     // ========================================================================
 
     _update(dt) {
+        // Update touch joystick menu presses (for shop navigation etc.)
+        this.input.updateJoystickMenuPresses(dt);
+
         switch (this.state) {
             case STATE.TITLE:
                 this.titleTime += dt;
@@ -960,6 +963,9 @@ export class Game {
                 }
                 break;
         }
+
+        // Render mobile touch controls on top of everything
+        this.input.renderTouchControls(ctx);
     }
 
     _renderInterior(ctx) {
