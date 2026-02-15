@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .pass { background: #1f3f2f; color: #4ec9b0; }
+        .fail { background: #3f1f1f; color: #f48771; }
+    </style>
+</head>
+<body>
+    <h1>Simple Module Test</h1>
+    <div id="results"></div>
+    
+    <script type="module">
+        const results = document.getElementById('results');
+        
+        function addResult(test, passed, message = '') {
+            const div = document.createElement('div');
+            div.className = `test-result ${passed ? 'pass' : 'fail'}`;
+            div.textContent = `${passed ? '✅' : '❌'} ${test}${message ? ': ' + message : ''}`;
+            results.appendChild(div);
+        }
+
+        // Test 1: Can we load constants?
+        try {
+            const constants = await import('./js/constants.js');
+            addResult('Load constants.js', true);
+            addResult('TILE_SIZE value', constants.TILE_SIZE === 32, `Got ${constants.TILE_SIZE}`);
+        } catch (err) {
+            addResult('Load constants.js', false, err.message);
+        }
+
+        // Test 2: Can we load the map?
+        try {
+            const mapModule = await import('./js/maps/dudeAngeles.js');
+            addResult('Load dudeAngeles.js', true);
+            
+            const mapData = mapModule.createDudeAngelesMap();
+            addResult('Create map data', true, `${mapData.width}x${mapData.height}`);
+            addResult('Map has tiles', mapData.tiles && mapData.tiles.length > 0);
+            addResult('Map has buildings', mapData.buildings && mapData.buildings.length > 0, `${mapData.buildings.length} buildings`);
+        } catch (err) {
+            addResult('Load/create map', false, err.message);
+        }
+
+        // Test 3: Can we load Game.js?
+        try {
+            const gameModule = await import('./js/Game.js');
+            addResult('Load Game.js', true);
+            addResult('Game class exists', typeof gameModule.Game === 'function');
+        } catch (err) {
+            addResult('Load Game.js', false, err.message);
+        }
+
+        // Test 4: Can we create a canvas and game instance?
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 960;
+            canvas.height = 640;
+            addResult('Create canvas', true);
+            
+            const gameModule = await import('./js/Game.js');
+            const game = new gameModule.Game(canvas);
+            addResult('Create Game instance', true);
+            
+            // Check game properties
+            addResult('Game has canvas', game.canvas === canvas);
+            addResult('Game has ctx', game.ctx !== null);
+            addResult('Game has map', game.map !== null && game.map !== undefined);
+            
+        } catch (err) {
+            addResult('Create game instance', false, err.message);
+            console.error('Full error:', err);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>City Dude - Diagnostic</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+        }
+        #status {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .error {
+            color: #f48771;
+            background: #3f1f1f;
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid #f48771;
+        }
+        .success {
+            color: #4ec9b0;
+            background: #1f3f2f;
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid #4ec9b0;
+        }
+        .warning {
+            color: #dcdcaa;
+            background: #3f3f1f;
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid #dcdcaa;
+        }
+        .info {
+            color: #9cdcfe;
+            padding: 5px 0;
+        }
+        #canvas-container {
+            margin-top: 20px;
+            border: 2px solid #3e3e42;
+            display: inline-block;
+            background: #0a0a1a;
+        }
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        h2 {
+            color: #569cd6;
+            margin-top: 20px;
+        }
+        .log-entry {
+            padding: 5px;
+            margin: 2px 0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 City Dude - Diagnostic Tool</h1>
+    
+    <div id="status">
+        <h2>Status</h2>
+        <div id="status-messages"></div>
+    </div>
+
+    <div id="console-logs">
+        <h2>Console Output</h2>
+        <div id="log-container"></div>
+    </div>
+
+    <div id="canvas-container">
+        <h2>Game Canvas</h2>
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <script type="module">
+        const statusDiv = document.getElementById('status-messages');
+        const logContainer = document.getElementById('log-container');
+        
+        function addStatus(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = message;
+            statusDiv.appendChild(div);
+        }
+
+        function addLog(message, type = 'log') {
+            const div = document.createElement('div');
+            div.className = `log-entry ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(div);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Intercept console methods
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addLog(args.join(' '), 'info');
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addLog('ERROR: ' + args.join(' '), 'error');
+            addStatus('❌ Error: ' + args.join(' '), 'error');
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addLog('WARN: ' + args.join(' '), 'warning');
+        };
+
+        // Catch unhandled errors
+        window.addEventListener('error', (event) => {
+            const msg = `${event.message} at ${event.filename}:${event.lineno}:${event.colno}`;
+            addStatus('❌ Uncaught Error: ' + msg, 'error');
+            addLog('UNCAUGHT ERROR: ' + msg, 'error');
+        });
+
+        // Catch unhandled promise rejections
+        window.addEventListener('unhandledrejection', (event) => {
+            addStatus('❌ Unhandled Promise Rejection: ' + event.reason, 'error');
+            addLog('PROMISE REJECTION: ' + event.reason, 'error');
+        });
+
+        // Test 1: Check if canvas exists
+        addStatus('🔍 Checking canvas element...', 'info');
+        const canvas = document.getElementById('gameCanvas');
+        if (canvas) {
+            addStatus('✅ Canvas element found', 'success');
+        } else {
+            addStatus('❌ Canvas element not found!', 'error');
+        }
+
+        // Test 2: Try to load the game
+        addStatus('🔍 Loading game module...', 'info');
+        
+        try {
+            import('./js/main.js')
+                .then(() => {
+                    addStatus('✅ Main module loaded successfully', 'success');
+                })
+                .catch(err => {
+                    addStatus('❌ Failed to load main module: ' + err.message, 'error');
+                    console.error('Module load error:', err);
+                });
+
+            // Also try to import Game directly to test
+            import('./js/Game.js')
+                .then(({ Game }) => {
+                    addStatus('✅ Game.js loaded successfully', 'success');
+                    
+                    // Try to instantiate the game
+                    if (canvas) {
+                        try {
+                            const game = new Game(canvas);
+                            addStatus('✅ Game instance created', 'success');
+                            
+                            // Try to start the game
+                            game.start();
+                            addStatus('✅ Game started', 'success');
+                            
+                            // Check if canvas has content after a short delay
+                            setTimeout(() => {
+                                const ctx = canvas.getContext('2d');
+                                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                const hasContent = imageData.data.some(pixel => pixel !== 0);
+                                
+                                if (hasContent) {
+                                    addStatus('✅ Canvas is rendering content', 'success');
+                                } else {
+                                    addStatus('⚠️ Canvas exists but appears blank', 'warning');
+                                }
+                            }, 1000);
+                        } catch (err) {
+                            addStatus('❌ Failed to create/start game: ' + err.message, 'error');
+                            console.error('Game instantiation error:', err);
+                        }
+                    }
+                })
+                .catch(err => {
+                    addStatus('❌ Failed to load Game.js: ' + err.message, 'error');
+                    console.error('Game.js load error:', err);
+                });
+
+            // Test all other modules
+            const modules = [
+                './js/constants.js',
+                './js/Input.js',
+                './js/Camera.js',
+                './js/Player.js',
+                './js/TileMap.js',
+                './js/GoalManager.js',
+                './js/HUD.js',
+                './js/Vehicle.js',
+                './js/NPC.js',
+                './js/Inventory.js',
+                './js/Interior.js',
+                './js/Sound.js',
+                './js/maps/dudeAngeles.js'
+            ];
+
+            modules.forEach(modulePath => {
+                import(modulePath)
+                    .then(() => {
+                        addLog(`✅ ${modulePath} loaded`, 'success');
+                    })
+                    .catch(err => {
+                        addLog(`❌ ${modulePath} failed: ${err.message}`, 'error');
+                        addStatus(`❌ Module error in ${modulePath}: ${err.message}`, 'error');
+                    });
+            });
+
+        } catch (err) {
+            addStatus('❌ Critical error during initialization: ' + err.message, 'error');
+            console.error('Init error:', err);
+        }
+    </script>
+</body>
+</html>
