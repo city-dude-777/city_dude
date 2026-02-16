@@ -127,6 +127,17 @@ export class Game {
             .map(b => InteriorManager.getDoorPosition(b));
         this.npcManager.setDoorPositions(doorPositions);
 
+        // Provide restaurant door positions for lunch break system
+        const restaurantNames = ['Pizza Palace', 'Burger Barn', 'Taco Town', 'Sushi Street', 'Ice Cream Hut', 'Chill Coffee'];
+        const restaurantDoors = mapData.buildings
+            .filter(b => restaurantNames.includes(b.name))
+            .map(b => InteriorManager.getDoorPosition(b));
+        this.npcManager.setRestaurantDoors(restaurantDoors);
+
+        // Shop open/close schedule state
+        this.shopsOpen = true;
+        this._lastShopHour = -1;
+
         // Store buildings for door detection
         this.buildings = mapData.buildings;
 
@@ -254,6 +265,21 @@ export class Game {
         this.gameMinutes += this.gameSpeed * dt;
         if (this.gameMinutes >= 1440) this.gameMinutes -= 1440;
         this.hud.setDayInfo(this.inventory.day, this._getTimeString());
+
+        // ---- NPC Schedules (lunch breaks) ----
+        this.npcManager.updateSchedule(this.gameMinutes);
+
+        // ---- Shop open/close schedule ----
+        const currentHour = Math.floor(this.gameMinutes / 60);
+        if (currentHour >= 18 && this.shopsOpen) {
+            // 6:00 PM — shops close
+            this.shopsOpen = false;
+            this.hud.showMessage('Shops and restaurants are closing for the night...', 2.5);
+        } else if (currentHour >= 8 && currentHour < 18 && !this.shopsOpen) {
+            // 8:00 AM — shops reopen
+            this.shopsOpen = true;
+            this.hud.showMessage('Good morning! Shops and restaurants are open!', 2.5);
+        }
 
         // ---- Sleep transition ----
         if (this.sleeping) {
@@ -449,6 +475,9 @@ export class Game {
                         // Warehouse is workers-only
                         if (nearDoor.name === 'Warehouse' && this.player.uniform !== 'Construction Worker') {
                             this.hud.showMessage('Workers only! Wear a construction uniform to enter.', 2);
+                            this.sound.playError();
+                        } else if (!this.shopsOpen && this._isShopBuilding(nearDoor.name)) {
+                            this.hud.showMessage(`${nearDoor.name} is closed. Opens at 8:00 AM.`, 2);
                             this.sound.playError();
                         } else {
                             this.interior.enter(nearDoor);
@@ -780,6 +809,14 @@ export class Game {
             this.wardrobeOpen = false;
         }
         this.hud.update(dt);
+    }
+
+    _isShopBuilding(name) {
+        const shopNames = [
+            'Pizza Palace', 'Burger Barn', 'Taco Town', 'Sushi Street', 'Ice Cream Hut', 'Chill Coffee',
+            'Card Store', 'Grocery Store', 'Gas Station', 'Car Wash',
+        ];
+        return shopNames.includes(name);
     }
 
     _getTimeString() {

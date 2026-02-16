@@ -365,6 +365,11 @@ export class NPCManager {
         // Construction zone (set by Game.js)
         this.constructionZone = null;
 
+        // Schedule system: lunch breaks and work/rest
+        this.restaurantDoors = []; // { x, y } positions near restaurant doors
+        this._scheduleState = 'normal'; // 'normal', 'lunch', 'returning'
+        this._lastScheduleMinute = -1;
+
         this._spawnNPCs(20);
 
         // Stadium NPCs (spawned later by Game.js via spawnStadiumNPCs)
@@ -375,6 +380,114 @@ export class NPCManager {
     /** Set building door positions for NPC building-enter behavior */
     setDoorPositions(doors) {
         this.doorPositions = doors;
+    }
+
+    /** Set restaurant door positions for lunch break system */
+    setRestaurantDoors(doors) {
+        this.restaurantDoors = doors;
+    }
+
+    /** Update NPC schedules based on game time */
+    updateSchedule(gameMinutes) {
+        const T = TILE_SIZE;
+        const hour = Math.floor(gameMinutes / 60);
+        const minute = Math.floor(gameMinutes % 60);
+
+        // 12:00 PM — lunch break starts
+        if (hour === 12 && minute === 0 && this._scheduleState === 'normal') {
+            this._scheduleState = 'lunch';
+            for (const npc of this.npcs) {
+                if (this._isLunchNPC(npc) && this.restaurantDoors.length > 0) {
+                    npc._savedX = npc.x;
+                    npc._savedY = npc.y;
+                    npc._savedState = npc.state;
+                    npc._savedZone = npc.zone;
+                    const door = this.restaurantDoors[Math.floor(Math.random() * this.restaurantDoors.length)];
+                    npc._lunchTarget = { x: door.x + (Math.random() - 0.5) * T, y: door.y + T };
+                    npc.state = 'lunch_going';
+                    npc.zone = null; // free to roam
+                }
+            }
+        }
+
+        // 12:45 PM — lunch over, return to posts
+        if (hour === 12 && minute >= 45 && this._scheduleState === 'lunch') {
+            this._scheduleState = 'returning';
+            for (const npc of this.npcs) {
+                if (npc.state === 'lunch_going' || npc.state === 'lunch_eating') {
+                    npc.state = 'lunch_returning';
+                }
+            }
+        }
+
+        // Update lunch NPC movement
+        for (const npc of this.npcs) {
+            if (npc.state === 'lunch_going' && npc._lunchTarget) {
+                const dx = npc._lunchTarget.x - npc.x;
+                const dy = npc._lunchTarget.y - npc.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 4) {
+                    const speed = 60;
+                    npc.x += (dx / dist) * speed * (1 / 60);
+                    npc.y += (dy / dist) * speed * (1 / 60);
+                    if (Math.abs(dx) >= Math.abs(dy)) npc.direction = dx > 0 ? DIR.RIGHT : DIR.LEFT;
+                    else npc.direction = dy > 0 ? DIR.DOWN : DIR.UP;
+                } else {
+                    npc.state = 'lunch_eating';
+                    npc.direction = DIR.DOWN;
+                }
+            }
+            if (npc.state === 'lunch_returning' && npc._savedX != null) {
+                const dx = npc._savedX - npc.x;
+                const dy = npc._savedY - npc.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 4) {
+                    const speed = 60;
+                    npc.x += (dx / dist) * speed * (1 / 60);
+                    npc.y += (dy / dist) * speed * (1 / 60);
+                    if (Math.abs(dx) >= Math.abs(dy)) npc.direction = dx > 0 ? DIR.RIGHT : DIR.LEFT;
+                    else npc.direction = dy > 0 ? DIR.DOWN : DIR.UP;
+                } else {
+                    npc.x = npc._savedX;
+                    npc.y = npc._savedY;
+                    npc.state = npc._savedState || 'walking';
+                    npc.zone = npc._savedZone || null;
+                    npc._savedX = null;
+                    npc._savedY = null;
+                    npc._lunchTarget = null;
+                }
+            }
+        }
+
+        // Check if all returned
+        if (this._scheduleState === 'returning') {
+            const anyLunch = this.npcs.some(n => n.state === 'lunch_returning');
+            if (!anyLunch) this._scheduleState = 'normal';
+        }
+
+        // Reset schedule at 1 PM in case it's stuck
+        if (hour === 13 && this._scheduleState !== 'normal') {
+            for (const npc of this.npcs) {
+                if (npc.state === 'lunch_going' || npc.state === 'lunch_eating' || npc.state === 'lunch_returning') {
+                    if (npc._savedX != null) {
+                        npc.x = npc._savedX;
+                        npc.y = npc._savedY;
+                        npc.state = npc._savedState || 'walking';
+                        npc.zone = npc._savedZone || null;
+                    } else {
+                        npc.state = 'walking';
+                    }
+                }
+            }
+            this._scheduleState = 'normal';
+        }
+    }
+
+    _isLunchNPC(npc) {
+        // Construction workers and business-style pedestrians go to lunch
+        if (npc.role === 'construction') return true;
+        if (npc.role === 'pedestrian' && npc.style && (npc.style.name === 'Business' || npc.style.name === 'Worker')) return true;
+        return false;
     }
 
     /** Set construction zone bounds to keep regular NPCs out */
@@ -1035,7 +1148,7 @@ export class NPCManager {
         let nearest = null;
         let nearestDist = TALK_DISTANCE;
 
-        const talkableStates = ['walking', 'idle', 'bball_drinking', 'bball_return_bench', 'bball_going_drink'];
+        const talkableStates = ['walking', 'idle', 'bball_drinking', 'bball_return_bench', 'bball_going_drink', 'lunch_eating', 'siren_dodge'];
         for (const npc of this.npcs) {
             if (!talkableStates.includes(npc.state)) continue;
             const c = npc.getCenter();
@@ -1099,26 +1212,50 @@ export class NPCManager {
 
     update(dt, vehicles, sirenVehicle) {
         for (const npc of this.npcs) {
-            // Siren dodge: pedestrians move to the side when siren is nearby
+            // Siren dodge: pedestrians step 1 tile to the side when siren is nearby
             if (sirenVehicle && npc.role === 'pedestrian' &&
-                (npc.state === 'walking' || npc.state === 'idle')) {
+                (npc.state === 'walking' || npc.state === 'idle' || npc.state === 'siren_dodge')) {
                 const cx = npc.x + npc.width / 2;
                 const cy = npc.y + npc.height / 2;
                 const dist = Math.hypot(cx - sirenVehicle.x, cy - sirenVehicle.y);
                 if (dist < TILE_SIZE * 6) {
-                    // Run away from the siren vehicle (perpendicular to its path)
-                    const dx = cx - sirenVehicle.x;
-                    const dy = cy - sirenVehicle.y;
-                    const len = Math.max(1, Math.hypot(dx, dy));
-                    npc.x += (dx / len) * 80 * dt;
-                    npc.y += (dy / len) * 80 * dt;
+                    if (npc.state !== 'siren_dodge') {
+                        // Start dodge: pick a perpendicular direction (1 tile away)
+                        npc._sirenOrigX = npc.x;
+                        npc._sirenOrigY = npc.y;
+                        // Move perpendicular to siren vehicle direction
+                        const svAngle = sirenVehicle.angle || 0;
+                        const perpX = Math.cos(svAngle);
+                        const perpY = Math.sin(svAngle);
+                        // Choose side: move to whichever side is further from siren
+                        const side = (cx - sirenVehicle.x) * perpX + (cy - sirenVehicle.y) * perpY > 0 ? 1 : -1;
+                        npc._sirenTargetX = npc.x + perpX * TILE_SIZE * side;
+                        npc._sirenTargetY = npc.y + perpY * TILE_SIZE * side;
+                        npc.state = 'siren_dodge';
+                    }
+                    // Move toward target (1 tile to side)
+                    const tdx = npc._sirenTargetX - npc.x;
+                    const tdy = npc._sirenTargetY - npc.y;
+                    const tLen = Math.hypot(tdx, tdy);
+                    if (tLen > 2) {
+                        const moveSpeed = 120 * dt;
+                        npc.x += (tdx / tLen) * Math.min(moveSpeed, tLen);
+                        npc.y += (tdy / tLen) * Math.min(moveSpeed, tLen);
+                    }
                     npc.animTimer += dt;
                     if (npc.animTimer >= 0.15) {
                         npc.animTimer -= 0.15;
                         npc.animFrame = npc.animFrame === 1 ? 2 : 1;
                     }
-                    continue; // skip normal update
+                    continue;
+                } else if (npc.state === 'siren_dodge') {
+                    // Siren passed, return to normal
+                    npc.state = 'walking';
+                    npc.stateTimer = 2 + Math.random() * 3;
                 }
+            } else if (!sirenVehicle && npc.state === 'siren_dodge') {
+                npc.state = 'walking';
+                npc.stateTimer = 2 + Math.random() * 3;
             }
 
             switch (npc.state) {

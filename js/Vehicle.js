@@ -853,38 +853,39 @@ export class VehicleManager {
     _updateAIVehicle(vehicle, dt) {
         const T = TILE_SIZE;
 
-        // --- Siren reaction: pull over to the side ---
+        // --- Siren reaction: pull 1 tile to the side and stop ---
         const sirenVehicle = this.getActiveSiren();
         if (sirenVehicle) {
             const dist = Math.hypot(vehicle.x - sirenVehicle.x, vehicle.y - sirenVehicle.y);
             if (dist < T * 8) {
-                // Slow down drastically
-                vehicle.currentSpeed = vehicle.aiSpeed * 0.15;
+                // Track original position for 1-tile limit
+                if (!vehicle._sirenOrigX) {
+                    vehicle._sirenOrigX = vehicle.x;
+                    vehicle._sirenOrigY = vehicle.y;
+                }
 
-                // Nudge toward the side of the road (right side relative to travel direction)
-                const nudge = 40 * dt;
+                // Nudge toward the side (max 1 tile from original position)
+                const nudge = 60 * dt;
+                const maxOffset = T;
                 switch (vehicle.direction) {
                     case DIR.RIGHT: case DIR.LEFT:
-                        // Move down (to the right curb from driver perspective)
-                        vehicle.y += nudge;
+                        if (Math.abs(vehicle.y - vehicle._sirenOrigY) < maxOffset) vehicle.y += nudge;
                         break;
                     case DIR.DOWN: case DIR.UP:
-                        // Move right
-                        vehicle.x += nudge;
+                        if (Math.abs(vehicle.x - vehicle._sirenOrigX) < maxOffset) vehicle.x += nudge;
                         break;
                 }
 
-                // Apply slow movement
-                const moveAmount = vehicle.currentSpeed * dt;
-                switch (vehicle.direction) {
-                    case DIR.RIGHT: vehicle.x += moveAmount; break;
-                    case DIR.LEFT:  vehicle.x -= moveAmount; break;
-                    case DIR.DOWN:  vehicle.y += moveAmount; break;
-                    case DIR.UP:    vehicle.y -= moveAmount; break;
-                }
+                // Stop the vehicle
+                vehicle.currentSpeed = 0;
                 vehicle.angle = DIR_TO_ANGLE[vehicle.direction];
-                return; // skip normal AI logic
+                return;
             }
+        }
+        // Clear siren origin when siren is gone
+        if (vehicle._sirenOrigX && !sirenVehicle) {
+            vehicle._sirenOrigX = null;
+            vehicle._sirenOrigY = null;
         }
 
         const aheadDist = this._distanceToVehicleAhead(vehicle);
