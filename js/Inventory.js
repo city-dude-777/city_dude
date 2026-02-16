@@ -10,6 +10,8 @@ export class Inventory {
         this.hasJob = null; // 'Police Officer', 'Firefighter', 'Construction Worker'
         this.day = 1;
         this.activeQuest = null; // { type, description, itemNeeded, giver, reward, delivered }
+        this.collectedCards = []; // { name, type, packType } — cards pulled from packs
+        this.binderCards = [];    // cards added to the binder
     }
 
     addMoney(amount) {

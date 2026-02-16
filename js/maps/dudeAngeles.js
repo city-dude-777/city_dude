@@ -315,7 +315,7 @@ export function createDudeAngelesMap() {
 
     // --- Card Store (near library) ---
     buildings.push({ x: 20, y: 30, w: 3, h: 2, color: '#e67e22', roof: '#d35400', name: 'Card Store',
-        enterable: true, shopkeeperName: 'Card Collector Rick', shopItems: ['mega_evo_card', 'josh_dallan_card', 'shiny_treasure_pack'] });
+        enterable: true, shopkeeperName: 'Card Collector Rick', shopItems: ['mega_evo_card', 'josh_dallan_card', 'shiny_treasure_pack', 'full_art_pack', 'basketball_pack'] });
     fillRect(tiles, TILES.BUILDING, 20, 30, 3, 2, width, height);
 
     // --- Museum (next to library) ---

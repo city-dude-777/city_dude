@@ -29,6 +29,8 @@ import { SoundManager } from './Sound.js';
 import { createDudeAngelesMap } from './maps/dudeAngeles.js';
 import { SkiGame } from './SkiGame.js';
 import { PackOpener } from './PackOpener.js';
+import { CardBinder } from './CardBinder.js';
+import { Phone } from './Phone.js';
 
 export class Game {
     constructor(canvas) {
@@ -93,8 +95,14 @@ export class Game {
             parkingSpot: { col: 6, row: 27 }, // just west of road work cones
         };
 
-        // Pack opener
+        // Pack opener & card binder
         this.packOpener = new PackOpener();
+        this.cardBinder = new CardBinder();
+        this.inventoryOpen = false;
+        this.inventoryCursor = 0;
+
+        // Phone
+        this.phone = new Phone();
 
         // Ski game
         this.skiGame = new SkiGame();
@@ -332,23 +340,90 @@ export class Game {
         if (this.packOpener.active) {
             const result = this.packOpener.update(dt, this.input);
             if (result === 'close') {
+                // Save pulled cards to inventory
+                for (const card of this.packOpener.cards) {
+                    this.inventory.collectedCards.push({ name: card.name, type: card.type, packType: card.packType, inBinder: false });
+                }
                 this.packOpener.close(this.canvas);
                 this.hud.showMessage('Cards added to your collection!', 2);
             }
             return;
         }
 
+        // ---- Card binder active ----
+        if (this.cardBinder.active) {
+            const result = this.cardBinder.update(dt, this.input, this.inventory);
+            if (result === 'close') {
+                this.cardBinder.close();
+            }
+            return;
+        }
+
+        // ---- Inventory UI active ----
+        if (this.inventoryOpen) {
+            this._updateInventoryUI(dt);
+            return;
+        }
+
+        // ---- Phone active ----
+        if (this.phone.active) {
+            const phoneResult = this.phone.update(dt, this.input, this.inventory);
+            if (phoneResult === 'close') {
+                this.phone.close();
+            }
+            // Check if a car was purchased online
+            const purchasedCar = this.phone.getPurchasedCar();
+            if (purchasedCar) {
+                const pTile = this.player.getTilePos();
+                this.vehicleManager.spawnParkedAt(purchasedCar, pTile.col + 2, pTile.row, DIR.DOWN);
+                this.hud.showMessage('Your new car was parked nearby!', 3);
+                this.sound.playPickup();
+            }
+            return;
+        }
+
+        // ---- Open phone with V key ----
+        if (this.input.isPressed('KeyV')) {
+            if (!this.interior.active && !this.dialogueActive && !this.player.isDriving) {
+                this.phone.open();
+                return;
+            }
+        }
+
         // ---- Open shiny treasure pack with H key ----
         if (this.input.isPressed('KeyH')) {
             if (!this.interior.active && !this.dialogueActive && !this.player.isDriving) {
-                if (this.inventory.hasItem('shiny_treasure_pack')) {
-                    this.inventory.removeItem('shiny_treasure_pack');
-                    this.packOpener.open(this.canvas);
-                    return;
-                } else {
-                    this.hud.showMessage('No Shiny Treasure Packs! Buy some at the Card Store.', 2);
+                const packTypes = ['shiny_treasure_pack', 'full_art_pack', 'basketball_pack'];
+                let opened = false;
+                for (const pt of packTypes) {
+                    if (this.inventory.hasItem(pt)) {
+                        this.inventory.removeItem(pt);
+                        this.packOpener.open(this.canvas, pt);
+                        opened = true;
+                        break;
+                    }
+                }
+                if (!opened) {
+                    this.hud.showMessage('No card packs! Buy some at the Card Store.', 2);
                     this.sound.playError();
                 }
+            }
+        }
+
+        // ---- Open card binder with B key ----
+        if (this.input.isPressed('KeyB')) {
+            if (!this.interior.active && !this.dialogueActive && !this.player.isDriving) {
+                this.cardBinder.open();
+                return;
+            }
+        }
+
+        // ---- Open inventory with I key ----
+        if (this.input.isPressed('KeyI')) {
+            if (!this.interior.active && !this.dialogueActive && !this.player.isDriving) {
+                this.inventoryOpen = true;
+                this.inventoryCursor = 0;
+                return;
             }
         }
 
@@ -915,6 +990,116 @@ export class Game {
         return shopNames.includes(name);
     }
 
+    _updateInventoryUI(dt) {
+        const items = this.inventory.items;
+        if (this.input.isPressed('ArrowUp') || this.input.isPressed('KeyW')) {
+            this.inventoryCursor = Math.max(0, this.inventoryCursor - 1);
+        }
+        if (this.input.isPressed('ArrowDown') || this.input.isPressed('KeyS')) {
+            this.inventoryCursor = Math.min(items.length - 1, this.inventoryCursor + 1);
+        }
+        if (this.input.isPressed('Escape') || this.input.isPressed('KeyI')) {
+            this.inventoryOpen = false;
+        }
+        this.hud.update(dt);
+    }
+
+    _renderInventoryUI(ctx) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+        const panelW = 500;
+        const panelH = 420;
+        const px = (CANVAS_WIDTH - panelW) / 2;
+        const py = (CANVAS_HEIGHT - panelH) / 2 - 10;
+
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(px, py, panelW, panelH);
+        ctx.strokeStyle = '#f1c40f';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px, py, panelW, panelH);
+
+        // Title
+        ctx.fillStyle = '#f1c40f';
+        ctx.font = '14px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('INVENTORY', CANVAS_WIDTH / 2, py + 28);
+
+        // Money
+        ctx.fillStyle = '#2ecc71';
+        ctx.font = '10px "Press Start 2P", monospace';
+        ctx.fillText(`$${this.inventory.money}`, CANVAS_WIDTH / 2, py + 50);
+
+        const items = this.inventory.items;
+        if (items.length === 0) {
+            ctx.fillStyle = '#888';
+            ctx.font = '9px "Press Start 2P", monospace';
+            ctx.fillText('No items yet!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+        } else {
+            const listX = px + 30;
+            const listY = py + 70;
+            const itemH = 30;
+            const maxVisible = 11;
+            const scrollOff = Math.max(0, this.inventoryCursor - 8);
+
+            for (let i = 0; i < maxVisible; i++) {
+                const ci = i + scrollOff;
+                if (ci >= items.length) break;
+                const item = items[ci];
+                const y = listY + i * itemH;
+                const selected = ci === this.inventoryCursor;
+
+                if (selected) {
+                    ctx.fillStyle = 'rgba(241, 196, 15, 0.15)';
+                    ctx.fillRect(listX - 4, y - 4, panelW - 52, itemH);
+                }
+
+                // Icon circle
+                ctx.fillStyle = item.color || '#888';
+                ctx.beginPath();
+                ctx.arc(listX + 8, y + 10, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = '8px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(item.icon || '?', listX + 8, y + 14);
+
+                // Name
+                ctx.fillStyle = selected ? '#fff' : '#bbb';
+                ctx.font = '8px "Press Start 2P", monospace';
+                ctx.textAlign = 'left';
+                ctx.fillText(item.name, listX + 26, y + 14);
+
+                // Quantity
+                ctx.fillStyle = '#f1c40f';
+                ctx.textAlign = 'right';
+                ctx.fillText(`x${item.quantity}`, px + panelW - 30, y + 14);
+            }
+
+            // Description of selected item
+            if (this.inventoryCursor < items.length) {
+                const sel = items[this.inventoryCursor];
+                ctx.fillStyle = '#888';
+                ctx.font = '7px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(sel.desc || '', CANVAS_WIDTH / 2, py + panelH - 30);
+            }
+        }
+
+        // Card count
+        const cardCount = this.inventory.collectedCards.length;
+        ctx.fillStyle = '#666';
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Cards collected: ${cardCount} | Binder: ${this.inventory.binderCards.length}`, CANVAS_WIDTH / 2, py + panelH - 12);
+
+        // Controls
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillText('\u2191\u2193 scroll | I / ESC = close', CANVAS_WIDTH / 2, CANVAS_HEIGHT - 15);
+        ctx.textAlign = 'left';
+    }
+
     _updateSkiing(dt) {
         this.skiGame.update(dt, this.input, this.canvas);
         if (!this.skiGame.active) {
@@ -1128,9 +1313,18 @@ export class Game {
 
             case STATE.PLAYING:
             case STATE.GOAL_COMPLETE:
-                if (this.packOpener.active) {
+                if (this.phone.active) {
+                    this._renderGame(ctx);
+                    this.phone.render(ctx);
+                } else if (this.packOpener.active) {
                     this._renderGame(ctx);
                     this.packOpener.render(ctx);
+                } else if (this.cardBinder.active) {
+                    this._renderGame(ctx);
+                    this.cardBinder.render(ctx, this.inventory);
+                } else if (this.inventoryOpen) {
+                    this._renderGame(ctx);
+                    this._renderInventoryUI(ctx);
                 } else if (this.interior.active) {
                     this._renderInterior(ctx);
                 } else {

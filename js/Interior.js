@@ -27,6 +27,8 @@ export const SHOP_CATALOG = {
     mega_evo_card: { id: 'mega_evo_card', name: 'Mega Evolution Card', price: 50, icon: 'M', color: '#e74c3c', desc: 'Ultra rare Mega Evolution!' },
     josh_dallan_card: { id: 'josh_dallan_card', name: 'PSA 10 Josh Dallan', price: 200, icon: 'J', color: '#1a5276', desc: '1/1 PSA 10 Dude Dinosaur #17' },
     shiny_treasure_pack: { id: 'shiny_treasure_pack', name: 'Shiny Treasure Pack', price: 30, icon: 'S', color: '#ffd700', desc: 'Shiny holographic treasure pack!' },
+    full_art_pack: { id: 'full_art_pack', name: 'Full Art Pack', price: 45, icon: 'F', color: '#e74c3c', desc: 'Full art illustration cards!' },
+    basketball_pack: { id: 'basketball_pack', name: 'Basketball Card Pack', price: 25, icon: 'B', color: '#e67e22', desc: 'NBA player cards inside!' },
     snowboard: { id: 'snowboard', name: 'Snowboard', price: 120, icon: 'W', color: '#2980b9', desc: 'Rad snowboard for the slopes!' },
     skis:      { id: 'skis',      name: 'Skis',      price: 100, icon: 'K', color: '#e74c3c', desc: 'Fast carving skis!' },
 };

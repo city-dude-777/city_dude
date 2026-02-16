@@ -41,7 +41,7 @@ export class Input {
             const gameKeys = [
                 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
                 'Space', 'Enter', 'KeyW', 'KeyA', 'KeyS', 'KeyD',
-                'KeyE', 'KeyF', 'KeyC', 'KeyQ', 'KeyH', 'Tab', 'Escape',
+                'KeyE', 'KeyF', 'KeyC', 'KeyQ', 'KeyH', 'KeyI', 'KeyB', 'KeyP', 'KeyL', 'KeyV', 'Tab', 'Escape',
             ];
             if (gameKeys.includes(e.code)) {
                 e.preventDefault();
@@ -102,6 +102,9 @@ export class Input {
             // Open pack (H key)
             { id: 'pack', key: 'KeyH', x: rightX - 168, y: bottomY, w: btnSize, h: btnSize,
               label: 'H', color: '#ffd700', active: false, touchId: null, visible: true },
+            // Phone (V key)
+            { id: 'phone', key: 'KeyV', x: rightX - 168, y: bottomY - 60, w: btnSize, h: btnSize,
+              label: 'V', color: '#2980b9', active: false, touchId: null, visible: true },
         ];
     }
 

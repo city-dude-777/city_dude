@@ -1,10 +1,10 @@
 // ============================================================================
-// City Dude - Shiny Treasure Pack Opener
+// City Dude - Card Pack Opener (Shiny Treasure, Full Art, Basketball)
 // ============================================================================
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 
-// Card pools
-const COMMON_CARDS = [
+// ---- Shiny Treasure Pack pool ----
+const SHINY_COMMON = [
     { name: 'Pikachu', type: 'common' },
     { name: 'Charmander', type: 'common' },
     { name: 'Squirtle', type: 'common' },
@@ -21,8 +21,7 @@ const COMMON_CARDS = [
     { name: 'Rayquaza', type: 'common' },
     { name: 'Charizard', type: 'common' },
 ];
-
-const SPECIAL_CARDS = [
+const SHINY_SPECIAL = [
     { name: 'Charizard V-STAR', type: 'special' },
     { name: 'Mewtwo V-STAR', type: 'special' },
     { name: 'Rayquaza V-STAR', type: 'special' },
@@ -34,8 +33,80 @@ const SPECIAL_CARDS = [
     { name: 'Umbreon EX EVOLUTION', type: 'special' },
     { name: 'Giratina EX EVOLUTION', type: 'special' },
 ];
-
 const BUBBLE_MEW = { name: 'Japanese Bubble Mew', type: 'ultra_rare' };
+
+// ---- Full Art Pack pool ----
+const FULL_ART_COMMON = [
+    { name: 'Pikachu Full Art', type: 'common' },
+    { name: 'Eevee Full Art', type: 'common' },
+    { name: 'Gengar Full Art', type: 'common' },
+    { name: 'Snorlax Full Art', type: 'common' },
+    { name: 'Dragonite Full Art', type: 'common' },
+    { name: 'Gardevoir Full Art', type: 'common' },
+    { name: 'Mimikyu Full Art', type: 'common' },
+    { name: 'Sylveon Full Art', type: 'common' },
+    { name: 'Absol Full Art', type: 'common' },
+    { name: 'Zoroark Full Art', type: 'common' },
+];
+const FULL_ART_SPECIAL = [
+    { name: 'Charizard Full Art', type: 'special' },
+    { name: 'Mewtwo Full Art', type: 'special' },
+    { name: 'Rayquaza Full Art', type: 'special' },
+    { name: 'Umbreon Full Art', type: 'special' },
+    { name: 'Giratina Full Art', type: 'special' },
+    { name: 'Lugia Full Art', type: 'special' },
+    { name: 'Arceus Full Art', type: 'special' },
+    { name: 'Palkia Full Art', type: 'special' },
+];
+const FULL_ART_ULTRA = { name: 'Moonbreon Full Art', type: 'ultra_rare' };
+
+// ---- Basketball Card Pack pool ----
+const BBALL_COMMON = [
+    { name: 'LeBron James', type: 'common' },
+    { name: 'Stephen Curry', type: 'common' },
+    { name: 'Kevin Durant', type: 'common' },
+    { name: 'Giannis', type: 'common' },
+    { name: 'Jayson Tatum', type: 'common' },
+    { name: 'Luka Doncic', type: 'common' },
+    { name: 'Anthony Edwards', type: 'common' },
+    { name: 'Ja Morant', type: 'common' },
+    { name: 'Devin Booker', type: 'common' },
+    { name: 'Nikola Jokic', type: 'common' },
+    { name: 'Joel Embiid', type: 'common' },
+    { name: 'Damian Lillard', type: 'common' },
+    { name: 'Jimmy Butler', type: 'common' },
+    { name: 'Shai Gilgeous', type: 'common' },
+    { name: 'Tyrese Haliburton', type: 'common' },
+];
+const BBALL_SPECIAL = [
+    { name: 'LeBron James Gold', type: 'special' },
+    { name: 'Stephen Curry Gold', type: 'special' },
+    { name: 'Kevin Durant Gold', type: 'special' },
+    { name: 'Giannis Gold', type: 'special' },
+    { name: 'Luka Doncic Gold', type: 'special' },
+    { name: 'Nikola Jokic Gold', type: 'special' },
+    { name: 'Victor Wembanyama Gold', type: 'special' },
+];
+const BBALL_ULTRA = { name: 'Michael Jordan Legacy', type: 'ultra_rare' };
+
+// Pack type definitions
+const PACK_DEFS = {
+    shiny_treasure_pack: {
+        label: 'SHINY TREASURE',
+        color1: '#ffd700', color2: '#cc9900', accent: '#8b0000',
+        common: SHINY_COMMON, special: SHINY_SPECIAL, ultra: BUBBLE_MEW, ultraChance: 0.15,
+    },
+    full_art_pack: {
+        label: 'FULL ART',
+        color1: '#e74c3c', color2: '#962d22', accent: '#1a1a2e',
+        common: FULL_ART_COMMON, special: FULL_ART_SPECIAL, ultra: FULL_ART_ULTRA, ultraChance: 0.12,
+    },
+    basketball_pack: {
+        label: 'NBA BASKETBALL',
+        color1: '#e67e22', color2: '#a85c10', accent: '#1a3a6a',
+        common: BBALL_COMMON, special: BBALL_SPECIAL, ultra: BBALL_ULTRA, ultraChance: 0.10,
+    },
+};
 
 const CARD_W = 90;
 const CARD_H = 130;
@@ -46,6 +117,8 @@ export class PackOpener {
     constructor() {
         this.active = false;
         this.packsOpened = 0;
+        this.packType = 'shiny_treasure_pack'; // current pack being opened
+        this.packDef = PACK_DEFS.shiny_treasure_pack;
 
         // Phase: 'pack_display', 'slicing', 'revealing', 'done'
         this.phase = 'pack_display';
@@ -77,8 +150,10 @@ export class PackOpener {
         this._onTouchEnd = null;
     }
 
-    open(canvas) {
+    open(canvas, packType) {
         this.active = true;
+        this.packType = packType || 'shiny_treasure_pack';
+        this.packDef = PACK_DEFS[this.packType] || PACK_DEFS.shiny_treasure_pack;
         this.phase = 'pack_display';
         this.sliceProgress = 0;
         this.sliceStarted = false;
@@ -102,27 +177,21 @@ export class PackOpener {
 
     _generateCards() {
         this.cards = [];
-        const cardCount = 5;
+        const def = this.packDef;
+        const hasUltra = Math.random() < def.ultraChance;
+        const special = def.special[Math.floor(Math.random() * def.special.length)];
 
-        // Random chance to get a Bubble Mew (~15% per pack)
-        const hasBubbleMew = Math.random() < 0.15;
-
-        // 1 special card guaranteed per pack
-        const special = SPECIAL_CARDS[Math.floor(Math.random() * SPECIAL_CARDS.length)];
-
-        if (hasBubbleMew) {
-            // 3 commons + 1 special + Bubble Mew
+        if (hasUltra) {
             for (let i = 0; i < 3; i++) {
-                this.cards.push({ ...COMMON_CARDS[Math.floor(Math.random() * COMMON_CARDS.length)], revealed: false });
+                this.cards.push({ ...def.common[Math.floor(Math.random() * def.common.length)], packType: this.packType, revealed: false });
             }
-            this.cards.push({ ...special, revealed: false });
-            this.cards.push({ ...BUBBLE_MEW, revealed: false });
+            this.cards.push({ ...special, packType: this.packType, revealed: false });
+            this.cards.push({ ...def.ultra, packType: this.packType, revealed: false });
         } else {
-            // 4 commons + 1 special
-            for (let i = 0; i < cardCount - 1; i++) {
-                this.cards.push({ ...COMMON_CARDS[Math.floor(Math.random() * COMMON_CARDS.length)], revealed: false });
+            for (let i = 0; i < 4; i++) {
+                this.cards.push({ ...def.common[Math.floor(Math.random() * def.common.length)], packType: this.packType, revealed: false });
             }
-            this.cards.push({ ...special, revealed: false });
+            this.cards.push({ ...special, packType: this.packType, revealed: false });
         }
 
         // Shuffle
@@ -256,6 +325,7 @@ export class PackOpener {
     _renderPack(ctx) {
         const cx = CANVAS_WIDTH / 2;
         const cy = CANVAS_HEIGHT / 2 - 20;
+        const def = this.packDef;
 
         ctx.save();
         ctx.translate(cx + this.packShake, cy);
@@ -264,13 +334,11 @@ export class PackOpener {
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.fillRect(-PACK_W / 2 + 4, -PACK_H / 2 + 4, PACK_W, PACK_H);
 
-        // Pack body (gold foil)
+        // Pack body
         const grad = ctx.createLinearGradient(-PACK_W / 2, -PACK_H / 2, PACK_W / 2, PACK_H / 2);
-        grad.addColorStop(0, '#ffd700');
-        grad.addColorStop(0.3, '#ffec80');
-        grad.addColorStop(0.5, '#ffd700');
-        grad.addColorStop(0.7, '#e6b800');
-        grad.addColorStop(1, '#cc9900');
+        grad.addColorStop(0, def.color1);
+        grad.addColorStop(0.5, def.color1);
+        grad.addColorStop(1, def.color2);
         ctx.fillStyle = grad;
         ctx.fillRect(-PACK_W / 2, -PACK_H / 2, PACK_W, PACK_H);
 
@@ -280,22 +348,28 @@ export class PackOpener {
         ctx.fillRect(-PACK_W / 2, -PACK_H / 2, PACK_W, PACK_H / 3);
 
         // Pack border
-        ctx.strokeStyle = '#b8860b';
+        ctx.strokeStyle = def.color2;
         ctx.lineWidth = 3;
         ctx.strokeRect(-PACK_W / 2, -PACK_H / 2, PACK_W, PACK_H);
 
-        // Pack label
-        ctx.fillStyle = '#8b0000';
+        // Pack label background
+        ctx.fillStyle = def.accent;
         ctx.fillRect(-PACK_W / 2 + 10, -PACK_H / 2 + 20, PACK_W - 20, 50);
 
-        ctx.fillStyle = '#ffd700';
-        ctx.font = 'bold 11px "Press Start 2P", monospace';
+        // Pack label text (split into lines)
+        const words = def.label.split(' ');
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 10px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('SHINY', 0, -PACK_H / 2 + 42);
-        ctx.fillText('TREASURE', 0, -PACK_H / 2 + 58);
+        if (words.length === 1) {
+            ctx.fillText(words[0], 0, -PACK_H / 2 + 50);
+        } else {
+            ctx.fillText(words[0], 0, -PACK_H / 2 + 42);
+            ctx.fillText(words.slice(1).join(' '), 0, -PACK_H / 2 + 58);
+        }
 
         // Star emblem
-        ctx.fillStyle = '#ffd700';
+        ctx.fillStyle = def.color1;
         ctx.font = '20px monospace';
         ctx.fillText('\u2605', 0, 20);
 
@@ -316,10 +390,9 @@ export class PackOpener {
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Slice glow
-            ctx.shadowColor = '#ffd700';
+            ctx.shadowColor = def.color1;
             ctx.shadowBlur = 10;
-            ctx.strokeStyle = '#ffd700';
+            ctx.strokeStyle = def.color1;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, -PACK_H / 2);
@@ -331,10 +404,10 @@ export class PackOpener {
         ctx.restore();
 
         // Title
-        ctx.fillStyle = '#ffd700';
+        ctx.fillStyle = def.color1;
         ctx.font = '14px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('SHINY TREASURE PACK', CANVAS_WIDTH / 2, 60);
+        ctx.fillText(def.label + ' PACK', CANVAS_WIDTH / 2, 60);
         ctx.textAlign = 'left';
     }
 
@@ -507,53 +580,59 @@ export class PackOpener {
         // Character silhouette in art area
         const charCX = artX + artW / 2;
         const charCY = artY + artH / 2;
-        ctx.fillStyle = isUltraRare ? '#ff69b4' : isSpecial ? '#b8860b' : '#4a90d0';
+        const isBball = card.packType === 'basketball_pack';
+        ctx.fillStyle = isUltraRare ? '#ff69b4' : isSpecial ? '#b8860b' : isBball ? '#e67e22' : '#4a90d0';
 
-        if (isUltraRare) {
+        if (isUltraRare && isBball) {
+            // Michael Jordan silhouette (jumping)
+            ctx.fillStyle = '#c0392b';
+            ctx.fillRect(charCX - 6, charCY - 8, 12, 18); // body
+            ctx.fillStyle = '#f0c27a';
+            ctx.beginPath(); ctx.arc(charCX, charCY - 14, 7, 0, Math.PI * 2); ctx.fill(); // head
+            // Arms up (dunking)
+            ctx.fillStyle = '#c0392b';
+            ctx.fillRect(charCX - 12, charCY - 18, 6, 3);
+            ctx.fillRect(charCX + 6, charCY - 18, 6, 3);
+            // Ball above
+            ctx.fillStyle = '#e67e22';
+            ctx.beginPath(); ctx.arc(charCX + 8, charCY - 22, 5, 0, Math.PI * 2); ctx.fill();
+            // #23
+            ctx.fillStyle = '#fff'; ctx.font = '6px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('#23', charCX, charCY + 2); ctx.textAlign = 'left';
+        } else if (isUltraRare) {
             // Mew silhouette (cat-like)
-            ctx.beginPath();
-            ctx.ellipse(charCX, charCY, 14, 10, 0, 0, Math.PI * 2);
-            ctx.fill();
-            // Tail
-            ctx.beginPath();
-            ctx.moveTo(charCX + 10, charCY);
+            ctx.beginPath(); ctx.ellipse(charCX, charCY, 14, 10, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(charCX + 10, charCY);
             ctx.quadraticCurveTo(charCX + 22, charCY - 16, charCX + 16, charCY - 20);
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = ctx.fillStyle;
-            ctx.stroke();
-            // Ears
-            ctx.beginPath();
-            ctx.moveTo(charCX - 8, charCY - 8);
-            ctx.lineTo(charCX - 12, charCY - 18);
-            ctx.lineTo(charCX - 4, charCY - 10);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(charCX + 8, charCY - 8);
-            ctx.lineTo(charCX + 12, charCY - 18);
-            ctx.lineTo(charCX + 4, charCY - 10);
-            ctx.fill();
-            // Eyes
+            ctx.lineWidth = 3; ctx.strokeStyle = ctx.fillStyle; ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(charCX - 8, charCY - 8); ctx.lineTo(charCX - 12, charCY - 18);
+            ctx.lineTo(charCX - 4, charCY - 10); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(charCX + 8, charCY - 8); ctx.lineTo(charCX + 12, charCY - 18);
+            ctx.lineTo(charCX + 4, charCY - 10); ctx.fill();
             ctx.fillStyle = '#fff';
-            ctx.fillRect(charCX - 6, charCY - 3, 4, 4);
-            ctx.fillRect(charCX + 2, charCY - 3, 4, 4);
-            // Bubble
-            ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.arc(charCX + 18, charCY - 6, 6, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.fillRect(charCX - 6, charCY - 3, 4, 4); ctx.fillRect(charCX + 2, charCY - 3, 4, 4);
+            ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(charCX + 18, charCY - 6, 6, 0, Math.PI * 2); ctx.stroke();
+        } else if (isBball) {
+            // Basketball player silhouette
+            ctx.fillStyle = isSpecial ? '#b8860b' : '#e67e22';
+            ctx.fillRect(charCX - 5, charCY - 6, 10, 16); // jersey
+            ctx.fillStyle = '#f0c27a';
+            ctx.beginPath(); ctx.arc(charCX, charCY - 12, 6, 0, Math.PI * 2); ctx.fill(); // head
+            ctx.fillStyle = '#333';
+            ctx.fillRect(charCX - 4, charCY + 10, 3, 10); // left leg
+            ctx.fillRect(charCX + 1, charCY + 10, 3, 10); // right leg
+            // Ball
+            ctx.fillStyle = '#e67e22';
+            ctx.beginPath(); ctx.arc(charCX + 12, charCY - 4, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5;
+            ctx.beginPath(); ctx.arc(charCX + 12, charCY - 4, 5, 0, Math.PI * 2); ctx.stroke();
         } else {
             // Generic creature shape
-            ctx.beginPath();
-            ctx.ellipse(charCX, charCY + 4, 12, 16, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(charCX, charCY - 14, 10, 0, Math.PI * 2);
-            ctx.fill();
-            // Eyes
+            ctx.beginPath(); ctx.ellipse(charCX, charCY + 4, 12, 16, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(charCX, charCY - 14, 10, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#fff';
-            ctx.fillRect(charCX - 6, charCY - 18, 4, 4);
-            ctx.fillRect(charCX + 2, charCY - 18, 4, 4);
+            ctx.fillRect(charCX - 6, charCY - 18, 4, 4); ctx.fillRect(charCX + 2, charCY - 18, 4, 4);
         }
 
         // Card name
@@ -567,24 +646,24 @@ export class PackOpener {
 
         // Type badge at bottom
         if (isUltraRare) {
-            ctx.fillStyle = '#ff1493';
+            ctx.fillStyle = isBball ? '#c0392b' : '#ff1493';
             ctx.fillRect(x + 10, y + CARD_H - 30, CARD_W - 20, 18);
             ctx.fillStyle = '#fff';
             ctx.font = '6px "Press Start 2P", monospace';
-            ctx.fillText('ULTRA RARE', x + CARD_W / 2, y + CARD_H - 17);
+            ctx.fillText(isBball ? 'LEGEND' : 'ULTRA RARE', x + CARD_W / 2, y + CARD_H - 17);
         } else if (isSpecial) {
-            ctx.fillStyle = '#8b0000';
+            ctx.fillStyle = isBball ? '#1a3a6a' : '#8b0000';
             ctx.fillRect(x + 15, y + CARD_H - 30, CARD_W - 30, 18);
             ctx.fillStyle = '#ffd700';
             ctx.font = '6px "Press Start 2P", monospace';
-            const typeLabel = card.name.includes('V-STAR') ? 'V-STAR' : 'EX';
+            const typeLabel = isBball ? 'GOLD' : card.name.includes('V-STAR') ? 'V-STAR' : card.name.includes('Full Art') ? 'FULL ART' : 'EX';
             ctx.fillText(typeLabel, x + CARD_W / 2, y + CARD_H - 17);
         } else {
             ctx.fillStyle = 'rgba(0,0,0,0.3)';
             ctx.fillRect(x + 15, y + CARD_H - 28, CARD_W - 30, 16);
             ctx.fillStyle = '#ddd';
             ctx.font = '6px "Press Start 2P", monospace';
-            ctx.fillText('COMMON', x + CARD_W / 2, y + CARD_H - 17);
+            ctx.fillText(isBball ? 'NBA' : 'COMMON', x + CARD_W / 2, y + CARD_H - 17);
         }
 
         ctx.textAlign = 'left';
