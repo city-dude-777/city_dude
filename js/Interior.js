@@ -415,19 +415,56 @@ export class InteriorManager {
 
     _genCityHall(w, h) {
         // Reception desk
-        this.grid[2][Math.floor(w/2)] = CELL.COUNTER;
-        this.grid[2][Math.floor(w/2)-1] = CELL.COUNTER;
-        this.grid[2][Math.floor(w/2)+1] = CELL.COUNTER;
+        const mid = Math.floor(w / 2);
+        this.grid[2][mid] = CELL.COUNTER;
+        this.grid[2][mid - 1] = CELL.COUNTER;
+        this.grid[2][mid + 1] = CELL.COUNTER;
         // Benches
-        for (let r = 4; r < h-2; r += 2) {
+        for (let r = 4; r < h - 2; r += 2) {
             this.grid[r][2] = CELL.COUNTER;
-            this.grid[r][w-3] = CELL.COUNTER;
+            this.grid[r][w - 3] = CELL.COUNTER;
         }
-        // Flag
-        this.decor.push({ type: 'flag', col: Math.floor(w/2), row: 0 });
+        // Flag and plants
+        this.decor.push({ type: 'flag', col: mid, row: 0 });
         this.decor.push({ type: 'plant', col: 1, row: 1 });
-        this.decor.push({ type: 'plant', col: w-2, row: 1 });
-        this.interiorNPCs.push({ col: Math.floor(w/2), row: 1, style: { shirt: '#2c3e50', skin: '#f0c27a', hair: '#4a3520' } });
+        this.decor.push({ type: 'plant', col: w - 2, row: 1 });
+        // Mayor (shopkeeper so player can talk via E key)
+        this.shopkeeper = {
+            col: mid, row: 1,
+            name: 'Mayor Davis',
+            style: { shirt: '#2c3e50', pants: '#1a1a2e', skin: '#f0c27a', hair: '#4a3520', hat: null },
+        };
+        this.shopItems = [];
+        // Security guards with shades (flanking the mayor)
+        this.interiorNPCs.push({
+            col: mid - 2, row: 1,
+            style: { shirt: '#1a1a2e', skin: '#d4a574', hair: '#222', shades: true },
+            label: 'SECURITY',
+        });
+        this.interiorNPCs.push({
+            col: mid + 2, row: 1,
+            style: { shirt: '#1a1a2e', skin: '#d4a574', hair: '#222', shades: true },
+            label: 'SECURITY',
+        });
+        // Secretaries at desks
+        this.interiorNPCs.push({
+            col: mid - 1, row: 3,
+            style: { shirt: '#85929e', skin: '#e8c8a0', hair: '#6b3a2a' },
+            label: 'SECRETARY',
+        });
+        this.interiorNPCs.push({
+            col: mid + 1, row: 3,
+            style: { shirt: '#5b7fa6', skin: '#f0c27a', hair: '#1a1a1a' },
+            label: 'SECRETARY',
+        });
+        // Another secretary further back
+        if (h > 6) {
+            this.interiorNPCs.push({
+                col: mid, row: 5,
+                style: { shirt: '#a67c52', skin: '#c68642', hair: '#2c1810' },
+                label: 'SECRETARY',
+            });
+        }
     }
 
     _genWarehouse(w, h) {
@@ -713,20 +750,16 @@ export class InteriorManager {
         // Counter (shopkeeper area)
         const counterRow = 2;
         for (let c = 2; c < w-2; c++) this.grid[counterRow][c] = CELL.COUNTER;
-        // Display shelves along walls
+        // Display shelves along walls only
         for (let r = 3; r < h-2; r += 2) {
             if (this.grid[r][1] === CELL.FLOOR) this.grid[r][1] = CELL.SHELF;
             if (this.grid[r][w-2] === CELL.FLOOR) this.grid[r][w-2] = CELL.SHELF;
         }
-        // Glass display cases (center of store)
+        // Glass display cases (visual only — no solid tiles, so player can walk past)
         const mid = Math.floor(w / 2);
-        if (h > 5 && this.grid[4][mid] === CELL.FLOOR) {
-            this.grid[4][mid] = CELL.COUNTER;
+        if (h > 5) {
             this.decor.push({ type: 'glass_display', col: mid, row: 4 });
-        }
-        if (h > 5 && mid - 1 > 1 && this.grid[4][mid-1] === CELL.FLOOR) {
-            this.grid[4][mid-1] = CELL.COUNTER;
-            this.decor.push({ type: 'glass_display', col: mid-1, row: 4 });
+            if (mid - 1 > 1) this.decor.push({ type: 'glass_display', col: mid - 1, row: 4 });
         }
         // Card displays near entrance
         this.decor.push({ type: 'card_display', col: 1, row: 1 });
@@ -1271,7 +1304,26 @@ export class InteriorManager {
             ctx.fillStyle = s.shirt; ctx.fillRect(sx - 7, sy + 10 + bob, 14, 10);
             ctx.fillStyle = s.skin; ctx.fillRect(sx - 5, sy + 3 + bob, 10, 8);
             ctx.fillStyle = s.hair; ctx.fillRect(sx - 5, sy + 2 + bob, 10, 3);
-            ctx.fillStyle = '#222'; ctx.fillRect(sx - 3, sy + 7 + bob, 2, 2); ctx.fillRect(sx + 2, sy + 7 + bob, 2, 2);
+            // Eyes or shades
+            if (s.shades) {
+                ctx.fillStyle = '#111'; ctx.fillRect(sx - 4, sy + 6 + bob, 3, 3); ctx.fillRect(sx + 1, sy + 6 + bob, 3, 3);
+                ctx.fillRect(sx - 1, sy + 7 + bob, 2, 1); // bridge
+            } else {
+                ctx.fillStyle = '#222'; ctx.fillRect(sx - 3, sy + 7 + bob, 2, 2); ctx.fillRect(sx + 2, sy + 7 + bob, 2, 2);
+            }
+            // Label above NPC
+            if (npc.label) {
+                ctx.save();
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.font = '5px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                const tw = ctx.measureText(npc.label).width;
+                ctx.fillRect(sx - tw / 2 - 2, sy - 6 + bob, tw + 4, 10);
+                ctx.fillStyle = '#ccc';
+                ctx.fillText(npc.label, sx, sy + 2 + bob);
+                ctx.textAlign = 'left';
+                ctx.restore();
+            }
         }
     }
 

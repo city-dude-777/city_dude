@@ -705,6 +705,15 @@ export class Game {
                         this.hud.showMessage(lines[Math.floor(Math.random() * lines.length)], 2);
                         this.sound.playTalk();
                     }
+                    } else if (bName === 'City Hall') {
+                        const mayorLines = [
+                            `${name}: "We need leaders."`,
+                            `${name}: "This city needs strong people to step up."`,
+                            `${name}: "We need leaders. Are you one of them?"`,
+                            `${name}: "Dude Angeles depends on people like you."`,
+                        ];
+                        this.hud.showMessage(mayorLines[Math.floor(Math.random() * mayorLines.length)], 2.5);
+                        this.sound.playTalk();
                     } else if (bName === 'Dude Hotel') {
                         // Hotel - offer to sleep for $30
                         const cost = 30;

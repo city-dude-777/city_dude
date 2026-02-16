@@ -200,7 +200,7 @@ export function createDudeAngelesMap() {
     fillRect(tiles, TILES.BUILDING, 3, 22, 4, 2, width, height);
 
     // --- MC Block: Downtown ---
-    buildings.push({ x: 16, y: 16, w: 4, h: 4, color: '#2c3e50', roof: '#1a252f', name: 'City Hall', enterable: true, floors: 3 });
+    buildings.push({ x: 16, y: 16, w: 4, h: 4, color: '#2c3e50', roof: '#1a252f', name: 'City Hall', enterable: true, floors: 3, shopkeeperName: 'Mayor Davis', shopItems: [] });
     fillRect(tiles, TILES.BUILDING, 16, 16, 4, 4, width, height);
 
     buildings.push({ x: 21, y: 17, w: 2, h: 3, color: '#c0392b', roof: '#962d22', name: 'Fire Station', enterable: true, shopkeeperName: 'Chief Burns', shopItems: [], floors: 2 });
