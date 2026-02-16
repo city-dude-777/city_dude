@@ -412,10 +412,11 @@ export class VehicleManager {
             ...this.lanes.down.map(c => ({ col: c, dir: DIR.DOWN })),
             ...this.lanes.up.map(c => ({ col: c, dir: DIR.UP })),
         ];
+
+        // Spawn civilian AI vehicles
+        const civilianTypes = ['sedan', 'suv', 'taxi', 'van', 'pickup_truck', 'taxi'];
         for (let i = 0; i < count; i++) {
-            // Mix of vehicle types - mostly casual
-            const aiTypes = ['sedan', 'suv', 'taxi', 'van', 'pickup_truck'];
-            const typeName = aiTypes[i % aiTypes.length];
+            const typeName = civilianTypes[i % civilianTypes.length];
             const lane = allLanes[Math.floor(Math.random() * allLanes.length)];
             let x, y;
             if (lane.dir === DIR.RIGHT || lane.dir === DIR.LEFT) {
@@ -425,8 +426,34 @@ export class VehicleManager {
                 x = lane.col * TILE_SIZE + TILE_SIZE / 2;
                 y = (4 + Math.random() * (this.mapHeight - 8)) * TILE_SIZE;
             }
-            this.vehicles.push(new Vehicle(typeName, x, y, lane.dir, 'ai'));
+            const v = new Vehicle(typeName, x, y, lane.dir, 'ai');
+            if (typeName === 'taxi') v.aiRole = 'taxi';
+            this.vehicles.push(v);
         }
+
+        // Spawn emergency AI vehicles (2 of each)
+        const emergencyTypes = ['police', 'police', 'firetruck', 'firetruck', 'ambulance', 'ambulance'];
+        for (const typeName of emergencyTypes) {
+            const lane = allLanes[Math.floor(Math.random() * allLanes.length)];
+            let x, y;
+            if (lane.dir === DIR.RIGHT || lane.dir === DIR.LEFT) {
+                y = lane.row * TILE_SIZE + TILE_SIZE / 2;
+                x = (4 + Math.random() * (this.mapWidth - 8)) * TILE_SIZE;
+            } else {
+                x = lane.col * TILE_SIZE + TILE_SIZE / 2;
+                y = (4 + Math.random() * (this.mapHeight - 8)) * TILE_SIZE;
+            }
+            const v = new Vehicle(typeName, x, y, lane.dir, 'ai');
+            v.sirenOn = true; // AI emergency vehicles have lights on
+            v.aiRole = typeName; // 'police', 'firetruck', 'ambulance'
+            this.vehicles.push(v);
+        }
+
+        // AI event timers
+        this._copPulloverTimer = 15 + Math.random() * 20; // first pullover in 15-35s
+        this._ambulanceEventTimer = 25 + Math.random() * 30;
+        this._taxiPickupTimer = 8 + Math.random() * 10;
+        this._hurtPersons = []; // { x, y, timer }
     }
 
     _spawnParkedVehicles() {
@@ -833,8 +860,144 @@ export class VehicleManager {
                     vehicle.currentSpeed = vehicle.aiSpeed;
                 }
             }
-            // 'parked' and 'player_driven' are handled elsewhere
+            // AI taxi passenger drop-off timer
+            if (vehicle.state === 'ai' && vehicle.aiRole === 'taxi' && vehicle._taxiPassenger) {
+                vehicle._taxiDropTimer -= dt;
+                if (vehicle._taxiDropTimer <= 0) {
+                    vehicle._taxiPassenger = false;
+                    this.lastAIEvent = 'Taxi dropped off a passenger';
+                }
+            }
+            // Ambulance responding to hurt person
+            if (vehicle.state === 'ai' && vehicle.aiRole === 'ambulance' && vehicle._respondingTo) {
+                const hp = vehicle._respondingTo;
+                const dist = Math.hypot(vehicle.x - hp.x, vehicle.y - hp.y);
+                if (dist < TILE_SIZE * 3) {
+                    // Arrived at scene
+                    vehicle._respondingTo = null;
+                    vehicle.currentSpeed = vehicle.aiSpeed;
+                    this.lastAIEvent = 'Ambulance helped an injured person!';
+                    // Remove hurt person
+                    const idx = this._hurtPersons.indexOf(hp);
+                    if (idx >= 0) this._hurtPersons.splice(idx, 1);
+                }
+            }
         }
+
+        // ---- AI City Events ----
+        this._updateCityEvents(dt);
+    }
+
+    /** Periodic city events: cop pullovers, taxi pickups, ambulance calls */
+    _updateCityEvents(dt) {
+        // --- AI Cop pullover ---
+        if (this._copPulloverTimer !== undefined) {
+            this._copPulloverTimer -= dt;
+            if (this._copPulloverTimer <= 0) {
+                this._copPulloverTimer = 20 + Math.random() * 30;
+                this._triggerCopPullover();
+            }
+        }
+
+        // --- AI Taxi pickup ---
+        if (this._taxiPickupTimer !== undefined) {
+            this._taxiPickupTimer -= dt;
+            if (this._taxiPickupTimer <= 0) {
+                this._taxiPickupTimer = 12 + Math.random() * 15;
+                this._triggerTaxiPickup();
+            }
+        }
+
+        // --- AI Ambulance event ---
+        if (this._ambulanceEventTimer !== undefined) {
+            this._ambulanceEventTimer -= dt;
+            if (this._ambulanceEventTimer <= 0) {
+                this._ambulanceEventTimer = 30 + Math.random() * 40;
+                this._triggerAmbulanceEvent();
+            }
+        }
+
+        // Update hurt persons timers
+        if (this._hurtPersons) {
+            for (const hp of this._hurtPersons) {
+                hp.timer -= dt;
+            }
+            this._hurtPersons = this._hurtPersons.filter(hp => hp.timer > 0);
+        }
+    }
+
+    _triggerCopPullover() {
+        // Find an AI police car
+        const cop = this.vehicles.find(v => v.state === 'ai' && v.aiRole === 'police' && !v._pullingOverTarget);
+        if (!cop) return;
+        // Find a nearby civilian AI car
+        let target = null;
+        let bestDist = TILE_SIZE * 12;
+        for (const v of this.vehicles) {
+            if (v === cop || v.state !== 'ai') continue;
+            if (v.aiRole) continue; // skip emergency/taxi
+            const dist = Math.hypot(v.x - cop.x, v.y - cop.y);
+            if (dist < bestDist) {
+                bestDist = dist;
+                target = v;
+            }
+        }
+        if (target) {
+            target.state = 'pulled_over';
+            target.currentSpeed = 0;
+            target.pulledOverTimer = 12 + Math.random() * 8;
+            this.lastAIEvent = `Police pulled over ${target.driverName}!`;
+        }
+    }
+
+    _triggerTaxiPickup() {
+        // Find an AI taxi without a passenger
+        const taxi = this.vehicles.find(v => v.state === 'ai' && v.aiRole === 'taxi' && !v._taxiPassenger);
+        if (!taxi) return;
+        // Simulate picking up a passenger (visual only — the taxi briefly stops then continues)
+        taxi._taxiPassenger = true;
+        taxi._taxiDropTimer = 8 + Math.random() * 10; // drop off in 8-18s
+        this.lastAIEvent = `Taxi picked up a passenger`;
+    }
+
+    _triggerAmbulanceEvent() {
+        // Create a "hurt person" at a random sidewalk
+        const T = TILE_SIZE;
+        const spots = [];
+        for (let r = 4; r < this.mapHeight - 4; r += 3) {
+            for (let c = 4; c < this.mapWidth - 4; c += 3) {
+                if (this.tiles[r][c] === 1) { // SIDEWALK = 1
+                    spots.push({ col: c, row: r });
+                }
+            }
+        }
+        if (spots.length === 0) return;
+        const spot = spots[Math.floor(Math.random() * spots.length)];
+        const hp = { x: spot.col * T + T / 2, y: spot.row * T + T / 2, timer: 25 };
+        if (!this._hurtPersons) this._hurtPersons = [];
+        this._hurtPersons.push(hp);
+
+        // Direct nearest ambulance toward the hurt person
+        let nearestAmb = null;
+        let nearestDist = Infinity;
+        for (const v of this.vehicles) {
+            if (v.state === 'ai' && v.aiRole === 'ambulance' && !v._respondingTo) {
+                const dist = Math.hypot(v.x - hp.x, v.y - hp.y);
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                    nearestAmb = v;
+                }
+            }
+        }
+        if (nearestAmb) {
+            nearestAmb._respondingTo = hp;
+            this.lastAIEvent = 'Someone is hurt! Ambulance responding...';
+        }
+    }
+
+    /** Get hurt person positions for rendering */
+    getHurtPersons() {
+        return this._hurtPersons || [];
     }
 
     /**
@@ -853,9 +1016,10 @@ export class VehicleManager {
     _updateAIVehicle(vehicle, dt) {
         const T = TILE_SIZE;
 
-        // --- Siren reaction: pull 1 tile to the side and stop ---
+        // --- Siren reaction: pull 1 tile to the side and stop (skip for emergency AI) ---
+        const isEmergencyAI = vehicle.aiRole === 'police' || vehicle.aiRole === 'firetruck' || vehicle.aiRole === 'ambulance';
         const sirenVehicle = this.getActiveSiren();
-        if (sirenVehicle) {
+        if (sirenVehicle && !isEmergencyAI) {
             const dist = Math.hypot(vehicle.x - sirenVehicle.x, vehicle.y - sirenVehicle.y);
             if (dist < T * 8) {
                 // Track original position for 1-tile limit

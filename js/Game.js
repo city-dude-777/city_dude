@@ -527,6 +527,12 @@ export class Game {
             this.vehicleManager.update(dt);
         }
 
+        // --- AI City Events ---
+        if (this.vehicleManager.lastAIEvent) {
+            this.hud.showMessage(this.vehicleManager.lastAIEvent, 3);
+            this.vehicleManager.lastAIEvent = null;
+        }
+
         // --- NPCs ---
         const sirenVehicle = this.vehicleManager.getActiveSiren();
         this.npcManager.update(dt, this.vehicleManager.vehicles, sirenVehicle);
@@ -1100,6 +1106,9 @@ export class Game {
         // 2b. Dumpsters at garbage center
         this._renderDumpsters(ctx);
 
+        // 2c. Hurt persons (ambulance events)
+        this._renderHurtPersons(ctx);
+
         // 3. Goal marker
         this.goalManager.renderGoalMarker(ctx, this.camera, this.time);
 
@@ -1304,6 +1313,32 @@ export class Game {
             ctx.fillStyle = '#333';
             ctx.fillRect(screen.x - 12, screen.y + 10, 5, 3);
             ctx.fillRect(screen.x + 7, screen.y + 10, 5, 3);
+        }
+    }
+
+    _renderHurtPersons(ctx) {
+        const hurtPersons = this.vehicleManager.getHurtPersons();
+        for (const hp of hurtPersons) {
+            const screen = this.camera.worldToScreen(hp.x, hp.y);
+            if (screen.x < -30 || screen.x > ctx.canvas.width + 30 ||
+                screen.y < -30 || screen.y > ctx.canvas.height + 30) continue;
+
+            // Lying person
+            ctx.fillStyle = '#f0c27a'; // skin
+            ctx.fillRect(screen.x - 8, screen.y + 2, 16, 6); // body horizontal
+            ctx.fillStyle = '#e74c3c'; // shirt
+            ctx.fillRect(screen.x - 6, screen.y + 2, 12, 6);
+            ctx.fillStyle = '#f0c27a';
+            ctx.fillRect(screen.x - 10, screen.y + 3, 4, 4); // head
+
+            // Red cross indicator above
+            const pulse = 0.5 + Math.sin(this.time * 4) * 0.5;
+            ctx.save();
+            ctx.globalAlpha = pulse;
+            ctx.fillStyle = '#e74c3c';
+            ctx.fillRect(screen.x - 1, screen.y - 12, 3, 9);
+            ctx.fillRect(screen.x - 4, screen.y - 9, 9, 3);
+            ctx.restore();
         }
     }
 
