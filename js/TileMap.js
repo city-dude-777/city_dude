@@ -66,7 +66,7 @@ export class TileMap {
         for (let r = 0; r < this.height; r++) {
             for (let c = 0; c < this.width; c++) {
                 if (this.tiles[r][c] === TILES.TREE) {
-                    this._renderTree(ctx, c * T, r * T);
+                    this._renderTree(ctx, c * T, r * T, r);
                 }
             }
         }
@@ -238,6 +238,16 @@ export class TileMap {
                 ctx.fillRect(coneCx - 1, coneBot - 16, 2, 3);
                 break;
             }
+            case TILES.SNOW: {
+                const snowColors = [COLORS.SNOW_1, COLORS.SNOW_2, COLORS.SNOW_3];
+                ctx.fillStyle = snowColors[seed % 3];
+                ctx.fillRect(x, y, T, T);
+                // Snow sparkle dots
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.fillRect(x + ((seed * 7) % 24) + 4, y + ((seed * 11) % 24) + 4, 2, 2);
+                ctx.fillRect(x + ((seed * 13) % 20) + 6, y + ((seed * 17) % 20) + 6, 1, 1);
+                break;
+            }
         }
     }
 
@@ -308,10 +318,11 @@ export class TileMap {
         ctx.fillRect(doorX + doorW - 3, doorY + doorH / 2, 2, 2);
     }
 
-    _renderTree(ctx, x, y) {
+    _renderTree(ctx, x, y, row) {
         const T = TILE_SIZE;
         const cx = x + T / 2;
         const cy = y + T / 2;
+        const isSnow = row >= 40;
 
         // Shadow
         ctx.fillStyle = 'rgba(0,0,0,0.15)';
@@ -323,16 +334,44 @@ export class TileMap {
         ctx.fillStyle = COLORS.TREE_TRUNK;
         ctx.fillRect(cx - 3, cy, 6, 12);
 
-        // Canopy (layered circles for depth)
-        ctx.fillStyle = COLORS.TREE_CANOPY;
-        ctx.beginPath();
-        ctx.arc(cx, cy - 2, 12, 0, Math.PI * 2);
-        ctx.fill();
+        if (isSnow) {
+            // Pine tree shape for snowy area
+            ctx.fillStyle = '#2d5a1e';
+            ctx.beginPath();
+            ctx.moveTo(cx - 12, cy + 4);
+            ctx.lineTo(cx, cy - 14);
+            ctx.lineTo(cx + 12, cy + 4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(cx - 9, cy - 4);
+            ctx.lineTo(cx, cy - 18);
+            ctx.lineTo(cx + 9, cy - 4);
+            ctx.closePath();
+            ctx.fill();
+            // Snow on top
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(cx - 6, cy - 8);
+            ctx.lineTo(cx, cy - 18);
+            ctx.lineTo(cx + 6, cy - 8);
+            ctx.closePath();
+            ctx.fill();
+            // Snow patches
+            ctx.fillRect(cx - 8, cy + 1, 5, 3);
+            ctx.fillRect(cx + 4, cy - 1, 5, 3);
+        } else {
+            // Regular deciduous tree
+            ctx.fillStyle = COLORS.TREE_CANOPY;
+            ctx.beginPath();
+            ctx.arc(cx, cy - 2, 12, 0, Math.PI * 2);
+            ctx.fill();
 
-        ctx.fillStyle = COLORS.TREE_CANOPY_LIGHT;
-        ctx.beginPath();
-        ctx.arc(cx - 2, cy - 4, 8, 0, Math.PI * 2);
-        ctx.fill();
+            ctx.fillStyle = COLORS.TREE_CANOPY_LIGHT;
+            ctx.beginPath();
+            ctx.arc(cx - 2, cy - 4, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     _renderRoadMarkings(ctx) {
@@ -689,6 +728,7 @@ export class TileMap {
             [TILES.FLOWERS]: '#d4a84a',
             [TILES.FENCE]: '#8b6b4a',
             [TILES.CONE]: '#ff6600',
+            [TILES.SNOW]: '#e0eaf0',
         };
 
         for (let r = 0; r < this.height; r++) {

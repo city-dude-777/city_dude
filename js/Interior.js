@@ -27,6 +27,8 @@ export const SHOP_CATALOG = {
     mega_evo_card: { id: 'mega_evo_card', name: 'Mega Evolution Card', price: 50, icon: 'M', color: '#e74c3c', desc: 'Ultra rare Mega Evolution!' },
     josh_dallan_card: { id: 'josh_dallan_card', name: 'PSA 10 Josh Dallan', price: 200, icon: 'J', color: '#1a5276', desc: '1/1 PSA 10 Dude Dinosaur #17' },
     shiny_treasure_pack: { id: 'shiny_treasure_pack', name: 'Shiny Treasure Pack', price: 30, icon: 'S', color: '#ffd700', desc: 'Shiny holographic treasure pack!' },
+    snowboard: { id: 'snowboard', name: 'Snowboard', price: 120, icon: 'W', color: '#2980b9', desc: 'Rad snowboard for the slopes!' },
+    skis:      { id: 'skis',      name: 'Skis',      price: 100, icon: 'K', color: '#e74c3c', desc: 'Fast carving skis!' },
 };
 
 const CELL = { FLOOR: 0, WALL: 1, COUNTER: 2, SHELF: 3 };
@@ -47,6 +49,8 @@ const SK_STYLES = {
     gas_attendant: { shirt: '#e74c3c', pants: '#2c3e50', skin: '#d4a574', hair: '#222', hat: '#e74c3c' },
     locker_worker: { shirt: '#2c3e50', pants: '#1a1a2e', skin: '#f0c27a', hair: '#4a3520', hat: null },
     garbage_foreman: { shirt: '#dfff00', pants: '#555', skin: '#d4a574', hair: '#4a3520', hat: '#3498db' },
+    ski_ticket: { shirt: '#5b4a3a', pants: '#3b2a1a', skin: '#f0c27a', hair: '#4a3520', hat: '#c0392b' },
+    ski_shop:   { shirt: '#3a6b8c', pants: '#2c3e50', skin: '#e8b88a', hair: '#2c1810', hat: '#3a6b8c' },
 };
 
 const SK_STYLE_MAP = {
@@ -87,6 +91,8 @@ const SK_STYLE_MAP = {
     'Museum': SK_STYLES.curator,
     'Card Store': SK_STYLES.card_collector,
     'Garbage Break Room': SK_STYLES.garbage_foreman,
+    'Ski Ticket Booth': SK_STYLES.ski_ticket,
+    'Ski Store': SK_STYLES.ski_shop,
 };
 
 // ---- Interior Manager ----
@@ -226,6 +232,8 @@ export class InteriorManager {
         else if (name === 'Gas Station') this._genGasStation(w, h, building);
         else if (name === 'Car Wash') this._genCarWash(w, h);
         else if (name === 'Garbage Break Room') this._genGarbageBreakRoom(w, h, building);
+        else if (name === 'Ski Ticket Booth') this._genSkiTicketBooth(w, h, building);
+        else if (name === 'Ski Store') this._genSkiStore(w, h, building);
 
         // Set colors per building
         this._setColors(building);
@@ -866,6 +874,35 @@ export class InteriorManager {
         }
     }
 
+    _genSkiTicketBooth(w, h, building) {
+        for (let r = 1; r < h-1; r++) for (let c = 1; c < w-1; c++) this.grid[r][c] = CELL.FLOOR;
+        this.grid[1][Math.floor(w/2)] = CELL.COUNTER;
+        this.decor.push({ type: 'sign', col: Math.floor(w/2), row: 0, text: 'LIFT TICKETS' });
+        if (building.shopkeeperName) {
+            this.shopkeeper = { col: Math.floor(w/2), row: 1, name: building.shopkeeperName, style: SK_STYLES.ski_ticket };
+        }
+        this.shopItems = [];
+    }
+
+    _genSkiStore(w, h, building) {
+        for (let r = 1; r < h-1; r++) for (let c = 1; c < w-1; c++) this.grid[r][c] = CELL.FLOOR;
+        // Counter at top
+        this.grid[1][Math.floor(w/2)] = CELL.COUNTER;
+        // Ski racks (shelves along walls)
+        for (let r = 2; r < h - 2; r++) { this.grid[r][1] = CELL.SHELF; this.grid[r][w-2] = CELL.SHELF; }
+        this.decor.push({ type: 'ski_rack', col: 1, row: 2 });
+        this.decor.push({ type: 'ski_rack', col: w-2, row: 2 });
+        this.decor.push({ type: 'snowboard_display', col: 1, row: 3 });
+        this.decor.push({ type: 'snowboard_display', col: w-2, row: 3 });
+        if (building.shopkeeperName) {
+            this.shopkeeper = { col: Math.floor(w/2), row: 1, name: building.shopkeeperName, style: SK_STYLES.ski_shop };
+        }
+        this.shopItems = (building.shopItems || []).map(id => SHOP_CATALOG[id]).filter(Boolean);
+        // Two skiers browsing
+        this.interiorNPCs.push({ col: 2, row: h-2, style: { shirt: '#e74c3c', skin: '#f0c27a', hair: '#4a3520' }, label: '' });
+        this.interiorNPCs.push({ col: w-3, row: h-2, style: { shirt: '#3498db', skin: '#e8b88a', hair: '#222' }, label: '' });
+    }
+
     _genCarWash(w, h) {
         for (let r = 1; r < h-1; r++) for (let c = 1; c < w-1; c++) if (this.grid[r][c] !== CELL.FLOOR) this.grid[r][c] = CELL.FLOOR;
         this.grid[1][1] = CELL.SHELF;
@@ -902,6 +939,8 @@ export class InteriorManager {
             'Gas Station': { floor: '#d0d0d0', wall: '#c0392b' },
             'Car Wash': { floor: '#c8d8e8', wall: '#2980b9' },
             'Garbage Break Room': { floor: '#c0c0a8', wall: '#4a5528' },
+            'Ski Ticket Booth': { floor: '#c8b898', wall: '#4a3828' },
+            'Ski Store': { floor: '#d0e0e8', wall: '#2a5570' },
         };
         const c = colorMap[building.name];
         if (c) { this.floorColor = c.floor; this.wallColor = c.wall; }
@@ -1284,6 +1323,28 @@ export class InteriorManager {
                     ctx.fillStyle = '#fff'; ctx.font = '5px monospace';
                     ctx.fillText('\u2605', x + 12, y + 15);
                     ctx.fillText('\u2605', x + 28, y + 17);
+                    break;
+                case 'ski_rack':
+                    // Wall-mounted ski rack
+                    ctx.fillStyle = '#8b6b4a'; ctx.fillRect(x + 4, y + 4, ITILE - 8, 6);
+                    ctx.fillStyle = '#e74c3c'; ctx.fillRect(x + 8, y + 6, 3, 30);
+                    ctx.fillStyle = '#3498db'; ctx.fillRect(x + 16, y + 6, 3, 30);
+                    ctx.fillStyle = '#2ecc71'; ctx.fillRect(x + 24, y + 6, 3, 30);
+                    ctx.fillStyle = '#f39c12'; ctx.fillRect(x + 32, y + 6, 3, 30);
+                    break;
+                case 'snowboard_display':
+                    // Snowboard on wall
+                    ctx.fillStyle = '#2980b9'; ctx.fillRect(x + 6, y + 8, 36, 8);
+                    ctx.fillStyle = '#3498db'; ctx.fillRect(x + 8, y + 10, 32, 4);
+                    // Sticker
+                    ctx.fillStyle = '#f1c40f'; ctx.fillRect(x + 20, y + 10, 6, 4);
+                    break;
+                case 'sign':
+                    // Small sign board
+                    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(x + 6, y + 6, ITILE - 12, 18);
+                    ctx.fillStyle = '#fff'; ctx.font = '5px monospace'; ctx.textAlign = 'center';
+                    ctx.fillText(d.text || 'SIGN', x + ITILE / 2, y + 18);
+                    ctx.textAlign = 'left';
                     break;
             }
         }

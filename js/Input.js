@@ -41,7 +41,7 @@ export class Input {
             const gameKeys = [
                 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
                 'Space', 'Enter', 'KeyW', 'KeyA', 'KeyS', 'KeyD',
-                'KeyE', 'KeyF', 'KeyC', 'KeyQ', 'Tab', 'Escape',
+                'KeyE', 'KeyF', 'KeyC', 'KeyQ', 'KeyH', 'Tab', 'Escape',
             ];
             if (gameKeys.includes(e.code)) {
                 e.preventDefault();
@@ -99,6 +99,9 @@ export class Input {
             // Escape / Back
             { id: 'back', key: 'Escape', x: rightX - 112, y: bottomY - 60, w: btnSize, h: btnSize,
               label: 'ESC', color: '#95a5a6', active: false, touchId: null, visible: true },
+            // Open pack (H key)
+            { id: 'pack', key: 'KeyH', x: rightX - 168, y: bottomY, w: btnSize, h: btnSize,
+              label: 'H', color: '#ffd700', active: false, touchId: null, visible: true },
         ];
     }
 

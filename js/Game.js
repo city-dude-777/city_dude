@@ -27,6 +27,8 @@ import { Inventory } from './Inventory.js';
 import { InteriorManager, SHOP_CATALOG } from './Interior.js';
 import { SoundManager } from './Sound.js';
 import { createDudeAngelesMap } from './maps/dudeAngeles.js';
+import { SkiGame } from './SkiGame.js';
+import { PackOpener } from './PackOpener.js';
 
 export class Game {
     constructor(canvas) {
@@ -90,6 +92,14 @@ export class Game {
             reward: 250,
             parkingSpot: { col: 6, row: 27 }, // just west of road work cones
         };
+
+        // Pack opener
+        this.packOpener = new PackOpener();
+
+        // Ski game
+        this.skiGame = new SkiGame();
+        this.hasLiftTicket = false;
+        this.skiArea = null;
 
         // Title screen animation
         this.titleTime = 0;
@@ -197,6 +207,11 @@ export class Game {
             }));
         }
 
+        // Store ski area data
+        if (mapData.skiArea) {
+            this.skiArea = mapData.skiArea;
+        }
+
         const center = this.player.getCenter();
         this.camera.snapTo(center.x, center.y, this.tileMap.width, this.tileMap.height);
         this.mapName = mapData.name;
@@ -257,6 +272,10 @@ export class Game {
                     this.state = STATE.PLAYING;
                 }
                 break;
+
+            case STATE.SKIING:
+                this._updateSkiing(dt);
+                break;
         }
     }
 
@@ -306,6 +325,30 @@ export class Game {
                 this.wardrobeOpen = true;
                 this.wardrobeCursor = 0;
                 return;
+            }
+        }
+
+        // ---- Pack opener active ----
+        if (this.packOpener.active) {
+            const result = this.packOpener.update(dt, this.input);
+            if (result === 'close') {
+                this.packOpener.close(this.canvas);
+                this.hud.showMessage('Cards added to your collection!', 2);
+            }
+            return;
+        }
+
+        // ---- Open shiny treasure pack with H key ----
+        if (this.input.isPressed('KeyH')) {
+            if (!this.interior.active && !this.dialogueActive && !this.player.isDriving) {
+                if (this.inventory.hasItem('shiny_treasure_pack')) {
+                    this.inventory.removeItem('shiny_treasure_pack');
+                    this.packOpener.open(this.canvas);
+                    return;
+                } else {
+                    this.hud.showMessage('No Shiny Treasure Packs! Buy some at the Card Store.', 2);
+                    this.sound.playError();
+                }
             }
         }
 
@@ -449,10 +492,32 @@ export class Game {
                 } else {
                     this._exitCurrentVehicle();
                 }
-            } else {
-                // ON FOOT: check for pulled over vehicle to talk to
-                const center = this.player.getCenter();
-                const nearPulledOver = this.vehicleManager.findNearestPullover(center.x, center.y, TILE_SIZE * 2);
+                } else {
+                    // ON FOOT: check for pulled over vehicle to talk to
+                    const center = this.player.getCenter();
+
+                    // Ski lift check
+                    if (this.skiArea && !this.player.isDriving) {
+                        const liftX = (this.skiArea.liftCol + 0.5) * TILE_SIZE;
+                        const liftY = (this.skiArea.liftRow + 0.5) * TILE_SIZE;
+                        const liftDist = Math.hypot(center.x - liftX, center.y - liftY);
+                        if (liftDist < TILE_SIZE * 2) {
+                            if (!this.hasLiftTicket) {
+                                this.hud.showMessage('You need a lift ticket! Buy one at the Ski Ticket Booth.', 2.5);
+                                this.sound.playError();
+                            } else if (!this.inventory.hasItem('snowboard') && !this.inventory.hasItem('skis')) {
+                                this.hud.showMessage('You need a snowboard or skis! Buy them at the Ski Store.', 2.5);
+                                this.sound.playError();
+                            } else {
+                                const equip = this.inventory.hasItem('snowboard') ? 'snowboard' : 'skis';
+                                this.skiGame.start(equip);
+                                this.state = STATE.SKIING;
+                                this.hud.showMessage('Taking the ski lift up...', 2);
+                            }
+                        }
+                    }
+
+                    const nearPulledOver = this.vehicleManager.findNearestPullover(center.x, center.y, TILE_SIZE * 2);
 
                 if (nearPulledOver && nearPulledOver.vehicle.state === 'pulled_over') {
                     const v = nearPulledOver.vehicle;
@@ -749,6 +814,31 @@ export class Game {
                         ];
                         this.hud.showMessage(mayorLines[Math.floor(Math.random() * mayorLines.length)], 2.5);
                         this.sound.playTalk();
+                    } else if (bName === 'Ski Ticket Booth') {
+                        const cost = 75;
+                        if (this.hasLiftTicket) {
+                            this.hud.showMessage(`${name}: "You already have a lift ticket! Hit the slopes!"`, 2);
+                            this.sound.playTalk();
+                        } else if (this._skiTicketAsked) {
+                            // Second press — confirm purchase
+                            if (this.inventory.canAfford(cost)) {
+                                this.inventory.spend(cost);
+                                this.hasLiftTicket = true;
+                                this._skiTicketAsked = false;
+                                this.hud.showMessage(`${name}: "Here's your lift ticket! Head to the ski lift station!"`, 2.5);
+                                this.hud.showMoneyPopup(`-$${cost}`, 1);
+                                this.sound.playBuy();
+                            } else {
+                                this.hud.showMessage(`${name}: "You don't have enough money! Come back with $${cost}."`, 2.5);
+                                this.sound.playError();
+                                this._skiTicketAsked = false;
+                            }
+                        } else {
+                            // First press — ask the question
+                            this._skiTicketAsked = true;
+                            this.hud.showMessage(`${name}: "Do you want a lift ticket for $${cost}? Press E again to buy!"`, 3);
+                            this.sound.playTalk();
+                        }
                     } else if (bName === 'Dude Hotel') {
                         // Hotel - offer to sleep for $30
                         const cost = 30;
@@ -825,6 +915,23 @@ export class Game {
         return shopNames.includes(name);
     }
 
+    _updateSkiing(dt) {
+        this.skiGame.update(dt, this.input, this.canvas);
+        if (!this.skiGame.active) {
+            // Return to overworld
+            this.state = STATE.PLAYING;
+            // Place player back at ski lift station
+            if (this.skiArea) {
+                this.player.x = this.skiArea.liftCol * TILE_SIZE;
+                this.player.y = (this.skiArea.liftRow + 1) * TILE_SIZE;
+                this.player.direction = DIR.DOWN;
+                const center = this.player.getCenter();
+                this.camera.snapTo(center.x, center.y, this.tileMap.width, this.tileMap.height);
+            }
+            this.hud.showMessage('Back at the ski area!', 2);
+        }
+    }
+
     _getTimeString() {
         const h = Math.floor(this.gameMinutes / 60) % 24;
         const m = Math.floor(this.gameMinutes % 60);
@@ -886,8 +993,21 @@ export class Game {
             // NPC talk prompt
             const nearNPC = this.npcManager.findNearestTalkable(center.x, center.y);
 
+            // Ski lift prompt
+            let nearSkiLift = false;
+            if (this.skiArea) {
+                const liftX = (this.skiArea.liftCol + 0.5) * TILE_SIZE;
+                const liftY = (this.skiArea.liftRow + 0.5) * TILE_SIZE;
+                const liftDist = Math.hypot(center.x - liftX, center.y - liftY);
+                nearSkiLift = liftDist < TILE_SIZE * 2;
+            }
+
             // Show the highest priority prompt; hide others
-            if (nearDoor) {
+            if (nearSkiLift) {
+                this.hud.setDoorPrompt('');
+                this.hud.setVehiclePrompt('');
+                this.hud.setTalkPrompt('Ski Lift [E]');
+            } else if (nearDoor) {
                 this.hud.setDoorPrompt(nearDoor.name);
                 this.hud.setVehiclePrompt('');
                 this.hud.setTalkPrompt('');
@@ -1008,11 +1128,18 @@ export class Game {
 
             case STATE.PLAYING:
             case STATE.GOAL_COMPLETE:
-                if (this.interior.active) {
+                if (this.packOpener.active) {
+                    this._renderGame(ctx);
+                    this.packOpener.render(ctx);
+                } else if (this.interior.active) {
                     this._renderInterior(ctx);
                 } else {
                     this._renderGame(ctx);
                 }
+                break;
+
+            case STATE.SKIING:
+                this.skiGame.render(ctx);
                 break;
         }
 
@@ -1098,6 +1225,11 @@ export class Game {
         // 1b. Basketball court overlay (before entities so they walk on top)
         if (this.basketballCourt) {
             this._renderBasketballCourt(ctx);
+        }
+
+        // 1c. Ski lift station
+        if (this.skiArea) {
+            this._renderSkiLift(ctx);
         }
 
         // 2. Garbage cans
@@ -1340,6 +1472,54 @@ export class Game {
             ctx.fillRect(screen.x - 4, screen.y - 9, 9, 3);
             ctx.restore();
         }
+    }
+
+    _renderSkiLift(ctx) {
+        const T = TILE_SIZE;
+        const lc = this.skiArea.liftCol;
+        const lr = this.skiArea.liftRow;
+
+        // Lift station platform
+        for (let c = 0; c < 3; c++) {
+            const wx = (lc - 1 + c) * T + T / 2;
+            const wy = lr * T + T / 2;
+            const screen = this.camera.worldToScreen(wx, wy);
+            if (screen.x < -50 || screen.x > ctx.canvas.width + 50) continue;
+
+            // Platform base
+            ctx.fillStyle = '#666';
+            ctx.fillRect(screen.x - T / 2, screen.y - 4, T, 8);
+        }
+
+        // Lift pole
+        const poleX = (lc + 0.5) * T;
+        const poleY = lr * T;
+        const pScreen = this.camera.worldToScreen(poleX, poleY);
+        ctx.fillStyle = '#555';
+        ctx.fillRect(pScreen.x - 3, pScreen.y - 30, 6, 35);
+
+        // Cable
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(pScreen.x - 40, pScreen.y - 25);
+        ctx.lineTo(pScreen.x + 40, pScreen.y - 28);
+        ctx.stroke();
+
+        // Chair hanging
+        const chairBob = Math.sin(this.time * 2) * 2;
+        ctx.fillStyle = '#444';
+        ctx.fillRect(pScreen.x - 1, pScreen.y - 28, 2, 8 + chairBob);
+        ctx.fillRect(pScreen.x - 8, pScreen.y - 20 + chairBob, 16, 3);
+
+        // "SKI LIFT" sign
+        ctx.fillStyle = '#5b3a1a';
+        ctx.fillRect(pScreen.x - 24, pScreen.y + 10, 48, 16);
+        ctx.fillStyle = '#fff';
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('SKI LIFT', pScreen.x, pScreen.y + 22);
+        ctx.textAlign = 'left';
     }
 
     _renderBasketballCourt(ctx) {

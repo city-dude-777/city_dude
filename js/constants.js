@@ -19,6 +19,7 @@ export const TILES = {
     FLOWERS: 8,
     FENCE: 9,
     CONE: 10,
+    SNOW: 11,
 };
 
 // Which tiles block movement
@@ -44,6 +45,7 @@ export const STATE = {
     PLAYING: 'playing',
     GOAL_COMPLETE: 'goal_complete',
     PAUSED: 'paused',
+    SKIING: 'skiing',
 };
 
 // Color palette
@@ -62,6 +64,9 @@ export const COLORS = {
     FLOWERS_2: '#f1c40f',
     FLOWERS_3: '#9b59b6',
     FENCE: '#8b6b4a',
+    SNOW_1: '#eef4f8',
+    SNOW_2: '#e0eaf0',
+    SNOW_3: '#d5e2ec',
     TREE_TRUNK: '#6b4423',
     TREE_CANOPY: '#2d6b1e',
     TREE_CANOPY_LIGHT: '#3d8b2e',

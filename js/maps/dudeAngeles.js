@@ -74,7 +74,7 @@ function addSidewalks(tiles, width, height) {
 
 export function createDudeAngelesMap() {
     const width = 62;
-    const height = 40;
+    const height = 52;
     const tiles = createEmptyGrid(width, height);
     const buildings = [];
 
@@ -421,6 +421,56 @@ export function createDudeAngelesMap() {
         enterable: true, shopkeeperName: 'Garbage Foreman', shopItems: [] });
     fillRect(tiles, TILES.BUILDING, 53, 21, 2, 1, width, height);
 
+    // =====================================================================
+    // SKI MOUNTAIN (rows 40-51, south of city)
+    // =====================================================================
+
+    // Transition zone (row 40 is partial snow)
+    fillRect(tiles, TILES.SNOW, 1, 40, width - 2, 1, width, height);
+    // Snow-covered ground for the whole ski area
+    fillRect(tiles, TILES.SNOW, 1, 41, width - 2, 10, width, height);
+    // Border trees at the expanded bottom
+    for (let c = 0; c < width; c++) tiles[51][c] = TILES.TREE;
+
+    // Road connecting city to ski area (placed AFTER snow so it's not overwritten)
+    fillRect(tiles, TILES.ROAD, 28, 38, 2, 4, width, height);
+    fillRect(tiles, TILES.SIDEWALK, 27, 38, 1, 4, width, height);
+    fillRect(tiles, TILES.SIDEWALK, 30, 38, 1, 4, width, height);
+
+    // Concrete path into ski area
+    fillRect(tiles, TILES.CONCRETE, 25, 41, 12, 2, width, height);
+    fillRect(tiles, TILES.SIDEWALK, 25, 43, 12, 1, width, height);
+
+    // Pine trees around the ski area (snow trees)
+    const snowTreePositions = [
+        [1,41],[2,42],[3,41],[4,43],[5,41],[6,42],[7,44],[8,41],
+        [9,43],[10,42],[11,41],[12,44],[13,42],[14,41],
+        [45,41],[46,42],[47,41],[48,43],[49,42],[50,41],[51,44],[52,42],
+        [53,41],[54,43],[55,42],[56,41],[57,44],[58,42],[59,41],[60,42],
+        [1,45],[2,46],[3,48],[4,47],[5,49],[6,46],[7,48],[8,50],
+        [9,47],[10,49],[11,46],[12,48],[13,50],[14,47],
+        [45,45],[46,47],[47,46],[48,49],[49,48],[50,46],[51,47],
+        [52,49],[53,46],[54,48],[55,50],[56,47],[57,49],[58,46],[59,48],
+        [15,44],[16,46],[17,48],[18,50],[19,47],[20,44],[21,46],[22,49],
+        [38,44],[39,46],[40,48],[41,50],[42,47],[43,44],[44,46],
+    ];
+    for (const [c, r] of snowTreePositions) {
+        if (r < height - 1 && c > 0 && c < width - 1) tiles[r][c] = TILES.TREE;
+    }
+
+    // Ticket Booth
+    buildings.push({ x: 25, y: 41, w: 2, h: 1, color: '#5b4a3a', roof: '#4a3828', name: 'Ski Ticket Booth',
+        enterable: true, shopkeeperName: 'Ticket Guy', shopItems: [] });
+    fillRect(tiles, TILES.BUILDING, 25, 41, 2, 1, width, height);
+
+    // Ski Store
+    buildings.push({ x: 28, y: 41, w: 3, h: 2, color: '#3a6b8c', roof: '#2a5570', name: 'Ski Store',
+        enterable: true, shopkeeperName: 'Ski Shop Dan', shopItems: ['snowboard', 'skis'] });
+    fillRect(tiles, TILES.BUILDING, 28, 41, 3, 2, width, height);
+
+    // Ski Lift Station (bottom) — concrete pad with marker
+    fillRect(tiles, TILES.CONCRETE, 33, 41, 3, 2, width, height);
+
     // --- Goal Definitions ---
     const goals = [
         {
@@ -509,6 +559,11 @@ export function createDudeAngelesMap() {
             drinkRow: 3,
             homeTeam: 'DYNAMIC DUDES',
             awayTeam: 'NUGGETS',
+        },
+        skiArea: {
+            liftCol: 34,
+            liftRow: 42,
+            slopeLength: 120,
         },
     };
 }
